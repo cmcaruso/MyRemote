@@ -37,10 +37,10 @@ html, body {
 body { position: fixed; inset: 0; }
 #app {
   position: fixed;
-  top: 0; left: 0; right: 0;
-  /* lvh, not innerHeight/dvh: an iOS Home Screen app reports 59px short at launch. --vvh is only set while the keyboard is up. */
-  height: 100vh;
-  height: var(--vvh, 100lvh);
+  /* Fill exactly the area iOS draws: on iOS 27 a Home Screen app's web view can be shorter than the
+     screen, and lvh overshoots it. --vvh is only set while the keyboard is up. */
+  inset: 0;
+  height: var(--vvh, auto);
   padding: var(--sat) var(--sar) 0 var(--sal);
   display: flex;
   flex-direction: column;
