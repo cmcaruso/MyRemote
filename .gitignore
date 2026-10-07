@@ -1,0 +1,10 @@
+.build/
+build/
+.swiftpm/
+*.app
+.DS_Store
+# Per-machine settings: never commit
+scripts/signing.local
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json

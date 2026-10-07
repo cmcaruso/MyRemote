@@ -1,0 +1,3 @@
+# Copy to scripts/signing.local (untracked) to override the defaults for this Mac.
+# MYREMOTE_SIGN_IDENTITY="MyRemote Signing"
+# MYREMOTE_BUNDLE_ID="io.github.cmcaruso.myremote"
