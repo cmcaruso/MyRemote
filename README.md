@@ -43,7 +43,7 @@ The menu shows:
 - whether `tailscale serve` reaches it. If it does, you get the Remote's address with **Copy Remote Address** (Universal Clipboard hands it to the iPhone). If it doesn't, you get the `tailscale serve --bg <port>` command to copy. If Funnel is on, the menu warns you: Funnel puts the Remote on the public internet. The Host reads this from Tailscale's CLI (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`, or `tailscale` in `/usr/local/bin` or `/opt/homebrew/bin`). Without the CLI, the Host still works, and the menu just says it can't check;
 - how many Remotes are connected;
 - the Accessibility grant, with a button to its settings if it's missing;
-- **Launch at Login**. Move `MyRemote.app` to `/Applications` before you turn it on, because the login item remembers where the app is. macOS may ask you to approve it in System Settings → General → Login Items.
+- **Launch at Login**. The login item remembers where the app is. It stays on when `bundle.sh` rebuilds the app in place, but if you move the app, turn it off first and on again from the new place. macOS may ask you to approve it in System Settings → General → Login Items.
 
 ### 3. Add the Remote to the iPhone
 
