@@ -64,8 +64,33 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   border-radius: 14px var(--corner) 14px 14px;
   touch-action: none;
 }
-.conn { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+.conn { position: absolute; top: 14px; right: 14px; pointer-events: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 .conn.on { background: var(--ok); }
+
+.pad.drag { background: #151a24; border-color: #2c3a55; }
+.strip.on { background: var(--panel); color: var(--text); }
+.gear {
+  position: absolute; left: 18px; bottom: 12px;
+  width: 36px; height: 36px; border-radius: 50%;
+  color: var(--muted); font-size: 18px;
+}
+
+.sheet {
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px 18px 14px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.sheet::backdrop { background: rgb(0 0 0 / .55); }
+.sheet h2 { margin: 0 0 8px; font-size: 17px; }
+.setting { display: grid; grid-template-columns: 8em 1fr 3em; align-items: center; gap: 10px; min-height: 40px; }
+.setting label { color: var(--muted); }
+.setting output { text-align: right; font: 13px ui-monospace, Menlo, monospace; }
+.setting input[type=range] { width: 100%; accent-color: #0a84ff; }
+.sheet-buttons { display: flex; gap: 8px; margin-top: 12px; }
+.sheet-buttons button { flex: 1; height: 40px; border-radius: 10px; background: var(--panel-2); }
 
 .modes { grid-area: modes; display: flex; padding: 3px; background: var(--panel); border-radius: 11px; }
 .modes button { flex: 1; height: 36px; border-radius: 8px; font-size: 13px; color: var(--muted); }
