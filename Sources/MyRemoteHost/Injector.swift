@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import HostCore
 
@@ -38,6 +39,11 @@ final class Injector {
             startMomentum()
         case .touchDown:
             stopMomentum()
+        case let .mediaKey(key):
+            postMediaKey(key, down: true)
+            postMediaKey(key, down: false)
+        case .setVolume:
+            break // the Host sets volume through CoreAudio, not input events
         }
     }
 
@@ -73,6 +79,17 @@ final class Injector {
                                   mouseButton: button == .left ? .left : .right) else { return }
         event.setIntegerValueField(.mouseEventClickState, value: Int64(count))
         event.post(tap: .cghidEventTap)
+    }
+
+    /// A media key goes out as the system-defined event the keyboard's media row sends (subtype 8,
+    /// `NX_SUBTYPE_AUX_CONTROL_BUTTONS`), so the system routes it and shows its HUD.
+    private func postMediaKey(_ key: MediaKey, down: Bool) {
+        let event = NSEvent.otherEvent(
+            with: .systemDefined, location: .zero,
+            modifierFlags: NSEvent.ModifierFlags(rawValue: down ? 0xA00 : 0xB00),
+            timestamp: 0, windowNumber: 0, context: nil,
+            subtype: 8, data1: key.eventData(down: down), data2: -1)
+        event?.cgEvent?.post(tap: .cghidEventTap)
     }
 
     private func post(_ scroll: ScrollEvent) {

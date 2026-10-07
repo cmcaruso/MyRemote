@@ -1,14 +1,16 @@
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
+import { createVolumeSlider } from './volume-slider.js';
 
 // ---------- Modes ----------
 
 const MODES = ['trackpad', 'keyboard', 'media', 'presentation'];
 const PLACEHOLDER = {
   keyboard: 'Keyboard Mode is coming.',
-  media: 'Media Mode is coming.',
   presentation: 'Presentation Mode is coming.',
 };
+/** Mode panels that exist so far, by Mode; built further down. */
+const PANELS = {};
 
 const app = document.getElementById('app');
 const panel = document.getElementById('panel');
@@ -26,13 +28,14 @@ function storedMode() {
 
 function showMode(mode) {
   app.classList.toggle('full', mode === 'trackpad');
-  panel.textContent = PLACEHOLDER[mode] ?? '';
+  if (PANELS[mode]) panel.replaceChildren(PANELS[mode]);
+  else panel.textContent = PLACEHOLDER[mode] ?? '';
+  panel.classList.toggle('filled', Boolean(PANELS[mode]));
   for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === mode);
   try { localStorage.setItem('mode', mode); } catch {}
 }
 
 for (const b of modeButtons) b.addEventListener('click', () => showMode(b.dataset.mode));
-showMode(storedMode());
 
 // ---------- Connection ----------
 
@@ -43,6 +46,14 @@ function connect() {
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   sender = createSender(socket);
   socket.addEventListener('open', () => conn.classList.add('on'));
+  socket.addEventListener('message', (e) => {
+    let message;
+    try { message = JSON.parse(e.data); } catch { return; }
+    if (message.t === 'vol') {
+      volumeSlider.host(message, performance.now());
+      renderVolume();
+    }
+  });
   socket.addEventListener('close', () => {
     conn.classList.remove('on');
     setTimeout(connect, 1000);
@@ -159,3 +170,62 @@ listen(pad, () => trackpad, (commands) => {
   }
 });
 listen(strip, () => scrollStrip, (_, down) => strip.classList.toggle('on', down > 0));
+
+// ---------- Media Mode ----------
+
+const volumeSlider = createVolumeSlider();
+const media = document.createElement('div');
+media.className = 'media';
+media.innerHTML = `
+  <div class="transport">
+    <button data-key="prev" aria-label="Previous">⏮</button>
+    <button data-key="play" class="play" aria-label="Play or pause">⏯</button>
+    <button data-key="next" aria-label="Next">⏭</button>
+  </div>
+  <div class="volume">
+    <button data-key="voldown" aria-label="Volume down">−</button>
+    <div class="slider" id="slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
+      <div class="fill"></div><span></span>
+    </div>
+    <button data-key="volup" aria-label="Volume up">+</button>
+    <button data-key="mute" class="mute" aria-label="Mute">🔇</button>
+  </div>`;
+PANELS.media = media;
+
+for (const b of media.querySelectorAll('[data-key]')) {
+  b.addEventListener('click', () => sender.send({ t: 'k', k: b.dataset.key }));
+}
+
+const slider = media.querySelector('#slider');
+const fill = slider.querySelector('.fill');
+const readout = slider.querySelector('span');
+
+function renderVolume() {
+  const { level, muted, settable } = volumeSlider.state;
+  fill.style.width = `${level * 100}%`;
+  readout.textContent = settable ? `${Math.round(level * 100)}%` : 'Use − and +';
+  slider.classList.toggle('muted', muted);
+  slider.classList.toggle('fixed', !settable);
+  slider.setAttribute('aria-valuenow', String(Math.round(level * 100)));
+  media.querySelector('.mute').classList.toggle('on', muted);
+}
+
+function slide(e) {
+  e.preventDefault();
+  if (!volumeSlider.state.settable) return;
+  const box = slider.getBoundingClientRect();
+  const level = volumeSlider.touch((e.touches[0].clientX - box.left) / box.width, e.timeStamp);
+  sender.volume(level);
+  renderVolume();
+}
+slider.addEventListener('touchstart', slide, { passive: false });
+slider.addEventListener('touchmove', slide, { passive: false });
+for (const type of ['touchend', 'touchcancel']) {
+  slider.addEventListener(type, (e) => {
+    e.preventDefault();
+    if (e.touches.length === 0) volumeSlider.release(performance.now());
+  }, { passive: false });
+}
+renderVolume();
+
+showMode(storedMode());

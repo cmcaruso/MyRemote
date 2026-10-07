@@ -88,3 +88,16 @@ test('drops discrete commands while disconnected', () => {
 
   assert.deepEqual(socket.frames, []);
 });
+
+test('sends only the newest volume level while the socket is backed up', () => {
+  const socket = fakeSocket({ bufferedAmount: 64 });
+  const sender = createSender(socket);
+
+  sender.volume(0.2);
+  sender.volume(0.35);
+  sender.volume(0.5);
+  socket.bufferedAmount = 0;
+  sender.drain();
+
+  assert.deepEqual(socket.frames, [{ t: 'v', v: 0.5 }]);
+});

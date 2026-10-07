@@ -9,6 +9,8 @@ import Foundation
 /// - `{"t":"s","dx":0,"dy":-12}`: scroll by a pixel delta, natural direction (content follows the finger).
 /// - `{"t":"se","vx":0,"vy":-1.2}`: scroll ended; release velocity in px/ms for the Host's momentum, 0 for none.
 /// - `{"t":"x"}`: a finger touched down; stops any momentum, like touching a real trackpad.
+/// - `{"t":"k","k":"play"}`: press a media key: `play`, `next`, `prev`, `volup`, `voldown`, `mute`.
+/// - `{"t":"v","v":0.4}`: set the output volume, 0 to 1 (clamped).
 public enum Command: Equatable, Sendable {
     case move(dx: Double, dy: Double)
     case click(Button, count: Int)
@@ -17,6 +19,8 @@ public enum Command: Equatable, Sendable {
     case scroll(dx: Double, dy: Double)
     case scrollEnd(vx: Double, vy: Double)
     case touchDown
+    case mediaKey(MediaKey)
+    case setVolume(Double)
 
     public enum Button: Sendable {
         case left, right
@@ -50,6 +54,12 @@ extension Command {
             self = .scrollEnd(vx: vx, vy: vy)
         case "x":
             self = .touchDown
+        case "k":
+            guard let k = frame.k, let key = MediaKey(rawValue: k) else { return nil }
+            self = .mediaKey(key)
+        case "v":
+            guard let v = frame.v else { return nil }
+            self = .setVolume(min(max(v, 0), 1))
         default:
             return nil
         }
@@ -64,4 +74,6 @@ private struct Frame: Decodable {
     var n: Int?
     var vx: Double?
     var vy: Double?
+    var k: String?
+    var v: Double?
 }
