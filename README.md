@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: early. The walking skeleton works (one finger on the Remote moves the Mac's pointer). The other Modes are being built.
+Status: early. Trackpad and Media Modes work. Keyboard, Presentation and Pairing are being built, so until Pairing lands, anyone who can reach the Remote can control the Mac.
 
 ## Requirements
 
@@ -37,6 +37,14 @@ The app is signed ad hoc, so macOS asks for Accessibility again after every rebu
 
 The Host listens on `127.0.0.1:8484`. To use another port, run `defaults write io.github.cmcaruso.myremote port 9000` (or the bundle ID you set), and point `tailscale serve` at the same port.
 
+The menu shows:
+
+- whether the Host is serving, and on which port;
+- whether `tailscale serve` reaches it. If it does, you get the Remote's address with **Copy Remote Address** (Universal Clipboard hands it to the iPhone). If it doesn't, you get the `tailscale serve --bg <port>` command to copy. If Funnel is on, the menu warns you: Funnel puts the Remote on the public internet. The Host reads this from Tailscale's CLI (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`, or `tailscale` in `/usr/local/bin` or `/opt/homebrew/bin`). Without the CLI, the Host still works, and the menu just says it can't check;
+- how many Remotes are connected;
+- the Accessibility grant, with a button to its settings if it's missing;
+- **Launch at Login**. The login item remembers where the app is. It stays on when `bundle.sh` rebuilds the app in place, but if you move the app, turn it off first and on again from the new place. macOS may ask you to approve it in System Settings → General → Login Items.
+
 ### 3. Add the Remote to the iPhone
 
 1. On the iPhone, open `https://<your-mac>.<your-tailnet>.ts.net` in Safari.
@@ -54,7 +62,7 @@ When unbundled, the Host uses your terminal app's Accessibility grant, so rebuil
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer math). It's unit-tested and has no AppKit.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/` and the `/ws` WebSocket, and posts input with `CGEvent`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
