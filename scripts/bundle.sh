@@ -43,7 +43,13 @@ fi
 
 if [ "${1:-}" = "--run" ]; then
   pkill -x MyRemote 2>/dev/null && sleep 0.5 || true
-  # An ad-hoc rebuild leaves a stale Accessibility entry that looks on but no longer matches; clear it.
-  [ "$IDENTITY" = "-" ] && tccutil reset Accessibility "$BUNDLE_ID" >/dev/null 2>&1 || true
+  if [ "$IDENTITY" = "-" ]; then
+    # An ad-hoc rebuild leaves a stale Accessibility entry that looks on but no longer matches; clear it.
+    # Quit System Settings first: if it's open it keeps showing the stale row, and turning that on
+    # doesn't grant the new build.
+    osascript -e 'tell application "System Settings" to quit' >/dev/null 2>&1 || true
+    tccutil reset Accessibility "$BUNDLE_ID" >/dev/null 2>&1 || true
+    echo "Grant Accessibility to MyRemote when macOS asks (System Settings → Privacy & Security → Accessibility)."
+  fi
   open "$APP"
 fi
