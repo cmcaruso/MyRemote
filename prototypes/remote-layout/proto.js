@@ -30,7 +30,8 @@ const VARIANTS = {
 
 const params = new URLSearchParams(location.search);
 const state = {
-  variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
+  // The Home Screen app always relaunches at its start_url (?variant=A), so the last viewed variant wins.
+  variant: [storedVariant(), params.get('variant')].find(v => VARIANTS[v]) ?? 'A',
   mode: MODES.includes(params.get('mode')) ? params.get('mode') : 'trackpad',
   last: 'nothing sent yet',
 };
@@ -51,7 +52,11 @@ const fmt = n => (n >= 0 ? '+' : '') + Math.round(n);
 
 function send(cmd) { state.last = cmd; renderPill(); }
 function setMode(m) { state.mode = m; syncUrl(); renderPill(); }
-function syncUrl() { history.replaceState(null, '', `?variant=${state.variant}&mode=${state.mode}`); }
+function syncUrl() {
+  history.replaceState(null, '', `?variant=${state.variant}&mode=${state.mode}`);
+  try { localStorage.setItem('variant', state.variant); } catch {}
+}
+function storedVariant() { try { return localStorage.getItem('variant'); } catch { return null; } }
 
 // ---------- shared Mode pieces (the question is layout, so these stay the same across variants) ----------
 
@@ -401,9 +406,10 @@ function VariantC(root) {
 function VariantD(root) {
   const panels = { keyboard: keyboardPanel(), media: mediaPanel(), presentation: presentationPanel() };
   const panel = h('div', { class: 'd-panel' });
-  const seg = h('div', { class: 'seg' }, MODES.map(m => h('button', { 'data-mode': m, onclick: () => go(m) }, SHORT[m])));
+  const seg = h('div', { class: 'seg' }, MODES.map(m => h('button', { 'data-mode': m, onclick: () => go(m) },
+    h('span', { class: 'ico', html: ICON[m] }), h('span', {}, SHORT[m]))));
   const el = h('div', { class: 'd' },
-    h('div', { class: 'd-padarea' }, trackpad('Trackpad stays live in every Mode · try landscape'), scrollStrip()),
+    h('div', { class: 'd-padarea' }, trackpad('Trackpad stays live in every Mode · in landscape the Mode bar moves to the right'), scrollStrip()),
     seg,
     panel);
   root.append(el);
@@ -439,6 +445,7 @@ function cycle(step) {
 function render() {
   document.activeElement?.blur();
   app.replaceChildren();
+  app.dataset.variant = state.variant;
   VARIANTS[state.variant][1](app);
   syncUrl();
   renderPill();
@@ -452,18 +459,23 @@ addEventListener('keydown', e => {
 const app = document.getElementById('app');
 document.body.append(pill);
 
-// Track the visual viewport so bars sit right above the iOS keyboard instead of under it.
+// While the iOS keyboard is up, follow the visual viewport so bars sit just above it.
+// Otherwise leave sizing to CSS: iOS doesn't fire a final viewport resize after rotation.
 const vv = window.visualViewport;
-if (vv) {
-  const fit = () => {
+const keyboardUp = () => document.activeElement?.matches('input, textarea');
+const fit = () => {
+  if (vv && keyboardUp()) {
     document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
     app.style.transform = `translateY(${vv.offsetTop}px)`;
-  };
-  vv.addEventListener('resize', fit);
-  vv.addEventListener('scroll', fit);
-  fit();
-}
+  } else {
+    document.documentElement.style.removeProperty('--vvh');
+    app.style.transform = '';
+  }
+};
+vv?.addEventListener('resize', fit);
+vv?.addEventListener('scroll', fit);
+document.addEventListener('focusin', fit);
+document.addEventListener('focusout', () => setTimeout(() => { scrollTo(0, 0); fit(); }, 50));
 document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('focusout', () => setTimeout(() => scrollTo(0, 0), 50));
 
 render();
