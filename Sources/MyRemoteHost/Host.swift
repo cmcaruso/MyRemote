@@ -36,7 +36,13 @@ final class Host {
             remoteDirectory: Self.remoteDirectory(),
             port: port,
             commands: continuation,
-            onRemote: { [weak self] delta in await MainActor.run { self?.remotes += delta } }
+            onRemote: { [weak self] delta in
+                await MainActor.run {
+                    guard let self else { return }
+                    self.remotes += delta
+                    if delta < 0 { self.injector.remoteLeft() }
+                }
+            }
         )
         Task {
             serving = true
