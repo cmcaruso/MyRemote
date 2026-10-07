@@ -1,0 +1,272 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway, not production. Answers issue #7:
+  "Does trackpad control feel good enough over the tailnet?"
+  A real trackpad driving the Mac through the prototype Host (prototypes/trackpad-feel/host),
+  with live sliders for the acceleration curve and gestures, and a round-trip-time readout.
+  Every tuning change is sent to the Host and logged there.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Trackpad proto">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Trackpad Feel Prototype</title>
+  <style>
+    :root { --bg: #000; --surface: #121214; --panel: #1c1c1f; --line: #2a2a2e; --text: #f2f2f4; --muted: #8b8b93; --accent: #ff2bd6; --ok: #3ddc84; --bad: #ff5c5c; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.3 -apple-system, system-ui, sans-serif; overscroll-behavior: none; }
+    #root { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 6px max(6px, env(safe-area-inset-bottom)); }
+    #hud { display: flex; gap: 10px; align-items: center; padding: 4px 6px; font: 12px/1.2 ui-monospace, Menlo, monospace; color: var(--muted); white-space: nowrap; overflow: hidden; }
+    #hud b { color: var(--text); font-weight: 600; }
+    #conn { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); flex: none; }
+    #conn.on { background: var(--ok); }
+    #tuneBtn { margin-left: auto; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; }
+    #main { flex: 1; min-height: 0; display: flex; gap: 6px; }
+    #pad, #strip { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; background: var(--surface); border: 1px solid var(--line); }
+    #pad { flex: 1; border-radius: 22px; position: relative; display: grid; place-items: center; color: #3a3a40; font-size: 13px; transition: background .12s; }
+    #pad.drag { background: #2a1030; border-color: var(--accent); }
+    #pad.scroll { background: #101a2a; }
+    #strip { width: 44px; border-radius: 14px; display: grid; place-items: center; color: var(--muted); }
+    #strip.on { background: var(--panel); }
+    #gest { position: absolute; top: 10px; left: 14px; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+    #tune { display: none; max-height: 48%; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 8px 12px 10px; }
+    #tune.open { display: block; }
+    .row { display: grid; grid-template-columns: 7.5em 1fr 3.4em; align-items: center; gap: 8px; min-height: 34px; }
+    .row label { color: var(--muted); font-size: 13px; }
+    .row output { text-align: right; font: 12px ui-monospace, Menlo, monospace; }
+    .row input[type=range] { width: 100%; accent-color: var(--accent); }
+    .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 6px 0; }
+    .checks label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+    .btns { display: flex; gap: 8px; padding-top: 6px; }
+    .btns button { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; }
+    canvas { display: block; width: 100%; height: 70px; }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div id="hud">
+    <span id="conn"></span>
+    <span>rtt <b id="p50">–</b>/<b id="p95">–</b> ms</span>
+    <span>gain <b id="gain">–</b></span>
+    <span><b id="rate">0</b>/s</span>
+    <button id="tuneBtn">Tune</button>
+  </div>
+  <div id="main">
+    <div id="pad"><span id="gest">ready</span>trackpad</div>
+    <div id="strip">⇕</div>
+  </div>
+  <div id="tune"></div>
+</div>
+<script>
+// ---------- params (persisted per device as a convenience; the Host log is the record) ----------
+const DEFAULTS = {
+  sens: 1.5,      // base gain at slow finger speed
+  accel: 1.2,     // how much speed adds
+  exp: 1.0,       // curve shape: gain = sens * min(cap, 1 + accel * v^exp), v in px/ms
+  cap: 6,         // max multiplier over sens
+  scroll: 1.5,    // scroll speed multiplier
+  decay: 0.95,    // momentum decay per 1/120 s
+  momentum: true,
+  invert: false,
+  tapMs: 200,     // max tap duration
+  slop: 8,        // px of movement before a touch stops being a tap
+  hold: true,     // tap-and-hold, then move = drag
+  holdMs: 350,
+  dbl: true,      // double-tap-and-drag
+  dblMs: 280,     // window for the second tap
+};
+let P = { ...DEFAULTS };
+try { Object.assign(P, JSON.parse(localStorage.getItem('tp-params') || '{}')); } catch {}
+
+const SLIDERS = [
+  ['sens', 'speed', 0.5, 4, 0.1], ['accel', 'accel', 0, 4, 0.1], ['exp', 'curve exp', 0.5, 2.5, 0.1],
+  ['cap', 'max ×', 1, 12, 0.5], ['scroll', 'scroll speed', 0.3, 4, 0.1], ['decay', 'momentum', 0.85, 0.99, 0.005],
+  ['tapMs', 'tap ms', 100, 350, 10], ['slop', 'slop px', 2, 24, 1], ['holdMs', 'hold ms', 150, 900, 25], ['dblMs', 'dbl-tap ms', 150, 450, 10],
+];
+const CHECKS = [['momentum', 'momentum'], ['invert', 'invert scroll'], ['hold', 'hold-drag'], ['dbl', 'double-tap-drag']];
+
+const $ = (id) => document.getElementById(id);
+const tune = $('tune');
+tune.innerHTML =
+  '<canvas id="curve"></canvas>' +
+  SLIDERS.map(([k, l, min, max, step]) =>
+    `<div class="row"><label for="s-${k}">${l}</label><input id="s-${k}" type="range" min="${min}" max="${max}" step="${step}" value="${P[k]}"><output id="o-${k}">${P[k]}</output></div>`).join('') +
+  '<div class="checks">' + CHECKS.map(([k, l]) => `<label><input id="c-${k}" type="checkbox" ${P[k] ? 'checked' : ''}>${l}</label>`).join('') + '</div>' +
+  '<div class="btns"><button id="reset">Reset defaults</button><button id="send">Log params on Host</button></div>';
+
+let cfgTimer;
+function changed() {
+  try { localStorage.setItem('tp-params', JSON.stringify(P)); } catch {}
+  drawCurve();
+  clearTimeout(cfgTimer);
+  cfgTimer = setTimeout(() => send({ t: 'cfg', ...P }), 800);
+}
+for (const [k] of SLIDERS) $('s-' + k).addEventListener('input', (e) => { P[k] = +e.target.value; $('o-' + k).textContent = P[k]; changed(); });
+for (const [k] of CHECKS) $('c-' + k).addEventListener('change', (e) => { P[k] = e.target.checked; changed(); });
+$('reset').onclick = () => { try { localStorage.removeItem('tp-params'); } catch {} location.reload(); };
+$('send').onclick = () => send({ t: 'cfg', ...P, final: true });
+$('tuneBtn').onclick = () => { tune.classList.toggle('open'); drawCurve(); };
+
+const gainAt = (v) => P.sens * Math.min(P.cap, 1 + P.accel * Math.pow(v, P.exp));
+function drawCurve() {
+  const c = $('curve'); if (!c || !tune.classList.contains('open')) return;
+  const w = c.clientWidth, h = c.clientHeight, dpr = devicePixelRatio;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const vmax = 4, gmax = Math.max(4, gainAt(vmax) * 1.1);
+  g.strokeStyle = '#2a2a2e'; g.beginPath(); g.moveTo(0, h - 0.5); g.lineTo(w, h - 0.5); g.stroke();
+  g.strokeStyle = '#ff2bd6'; g.lineWidth = 2; g.beginPath();
+  for (let x = 0; x <= w; x += 2) { const y = h - (gainAt((x / w) * vmax) / gmax) * h; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.stroke();
+  g.fillStyle = '#8b8b93'; g.font = '11px ui-monospace, Menlo, monospace';
+  g.fillText(`gain vs finger speed (0–${vmax} px/ms), max ${gainAt(vmax).toFixed(1)}×`, 4, 12);
+}
+
+// ---------- transport ----------
+let ws, sentCount = 0;
+const pending = { mx: 0, my: 0, sx: 0, sy: 0 };
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { $('conn').classList.add('on'); send({ t: 'cfg', ...P, connect: true }); };
+  ws.onclose = () => { $('conn').classList.remove('on'); setTimeout(connect, 1000); };
+  ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'p') rtt(performance.now() - m.ts); };
+}
+function send(m) { if (ws && ws.readyState === 1) { ws.send(JSON.stringify(m)); sentCount++; } }
+const r2 = (x) => Math.round(x * 100) / 100;
+function flush() {
+  if (pending.mx || pending.my) { send({ t: 'm', dx: r2(pending.mx), dy: r2(pending.my) }); pending.mx = pending.my = 0; }
+  if (pending.sx || pending.sy) { send({ t: 's', p: 'c', dx: r2(pending.sx), dy: r2(pending.sy) }); pending.sx = pending.sy = 0; }
+}
+function now(m) { flush(); send(m); } // discrete events: flush motion first so they land in order
+(function frame() {
+  if (ws && ws.readyState === 1 && ws.bufferedAmount === 0) flush(); // backpressure: keep summing while the socket is behind
+  requestAnimationFrame(frame);
+})();
+
+const rtts = [];
+let pingId = 0;
+function rtt(ms) { rtts.push(ms); if (rtts.length > 120) rtts.shift(); }
+const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+setInterval(() => send({ t: 'p', id: ++pingId, ts: performance.now() }), 500);
+setInterval(() => {
+  if (rtts.length) { $('p50').textContent = pct(rtts, 0.5).toFixed(0); $('p95').textContent = pct(rtts, 0.95).toFixed(0); }
+  $('rate').textContent = sentCount; sentCount = 0;
+}, 1000);
+setInterval(() => { if (rtts.length) send({ t: 'stat', p50: r2(pct(rtts, 0.5)), p95: r2(pct(rtts, 0.95)), max: r2(Math.max(...rtts)), n: rtts.length }); }, 15000);
+connect();
+
+// ---------- gestures ----------
+const pad = $('pad'), gest = $('gest');
+let G = 'idle';            // idle | one | drag | two | scroll | done
+let start = null;          // {x, y, t} of the first finger
+let last = null;           // last single-finger position {x, y, t}
+let movedFar = false, holdTimer = 0, secondTap = false;
+let lastTap = { t: 0, x: 0, y: 0 };
+let twoStart = 0, centroid = null, vSamples = [];
+const setG = (g) => { G = g; gest.textContent = g; pad.classList.toggle('drag', g === 'drag'); pad.classList.toggle('scroll', g === 'scroll'); };
+
+function center(tl) { let x = 0, y = 0; for (const t of tl) { x += t.clientX; y += t.clientY; } return { x: x / tl.length, y: y / tl.length }; }
+
+function addMove(dx, dy, dtMs) {
+  const v = Math.hypot(dx, dy) / Math.max(dtMs, 4);
+  const g = gainAt(v);
+  $('gain').textContent = g.toFixed(1);
+  pending.mx += dx * g; pending.my += dy * g;
+}
+function addScroll(dx, dy, t) {
+  const k = P.scroll * (P.invert ? -1 : 1);
+  pending.sx += dx * k; pending.sy += dy * k;
+  vSamples.push({ t, dx: dx * k, dy: dy * k });
+  while (vSamples.length && t - vSamples[0].t > 80) vSamples.shift();
+}
+function endScroll(t) {
+  let vx = 0, vy = 0;
+  const recent = vSamples.filter((s) => t - s.t < 80);
+  if (P.momentum && recent.length > 1 && t - recent[recent.length - 1].t < 40) {
+    const span = Math.max(recent[recent.length - 1].t - recent[0].t, 8);
+    for (const s of recent) { vx += s.dx; vy += s.dy; }
+    vx /= span; vy /= span;
+  }
+  vSamples = [];
+  now({ t: 's', p: 'e', vx: r2(vx), vy: r2(vy), decay: P.momentum ? P.decay : 0 });
+}
+
+pad.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.timeStamp, n = e.touches.length;
+  if (n === 1 && G === 'idle') {
+    const p = e.touches[0];
+    start = { x: p.clientX, y: p.clientY, t }; last = { ...start };
+    movedFar = false;
+    secondTap = P.dbl && t - lastTap.t < P.dblMs && Math.hypot(p.clientX - lastTap.x, p.clientY - lastTap.y) < 60;
+    setG('one');
+    if (P.hold) holdTimer = setTimeout(() => { if (G === 'one' && !movedFar) { now({ t: 'd' }); setG('drag'); } }, P.holdMs);
+  } else if (n >= 2 && (G === 'one' || G === 'idle')) {
+    clearTimeout(holdTimer);
+    twoStart = t; centroid = center(e.touches); vSamples = [];
+    setG('two');
+  }
+}, { passive: false });
+
+pad.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.timeStamp;
+  if ((G === 'one' || G === 'drag') && e.touches.length === 1) {
+    const p = e.touches[0];
+    const dx = p.clientX - last.x, dy = p.clientY - last.y;
+    if (!movedFar && Math.hypot(p.clientX - start.x, p.clientY - start.y) > P.slop) {
+      movedFar = true; clearTimeout(holdTimer);
+      if (secondTap && G === 'one') { now({ t: 'd' }); setG('drag'); }
+    }
+    if (movedFar || G === 'drag') addMove(dx, dy, t - last.t);
+    last = { x: p.clientX, y: p.clientY, t };
+  } else if ((G === 'two' || G === 'scroll') && e.touches.length >= 2) {
+    const c = center(e.touches);
+    const dx = c.x - centroid.x, dy = c.y - centroid.y;
+    if (G === 'two' && Math.hypot(dx, dy) > P.slop) setG('scroll');
+    if (G === 'scroll') { addScroll(dx, dy, t); centroid = c; }
+  }
+}, { passive: false });
+
+function padEnd(e) {
+  e.preventDefault();
+  const t = e.timeStamp, left = e.touches.length;
+  clearTimeout(holdTimer);
+  if (G === 'one' && left === 0) {
+    if (!movedFar && t - start.t < P.tapMs) {
+      now({ t: 'c', b: 0, n: secondTap ? 2 : 1 });
+      lastTap = secondTap ? { t: 0, x: 0, y: 0 } : { t, x: start.x, y: start.y };
+    }
+    setG('idle');
+  } else if (G === 'drag' && left === 0) {
+    now({ t: 'u' }); lastTap = { t: 0, x: 0, y: 0 }; setG('idle');
+  } else if (G === 'two') {
+    if (t - twoStart < P.tapMs * 1.5) now({ t: 'c', b: 1, n: 1 });
+    setG(left ? 'done' : 'idle');
+  } else if (G === 'scroll') {
+    endScroll(t);
+    setG(left ? 'done' : 'idle');
+  } else if (left === 0) {
+    setG('idle');
+  }
+}
+pad.addEventListener('touchend', padEnd, { passive: false });
+pad.addEventListener('touchcancel', padEnd, { passive: false });
+
+// Scroll strip: one finger, vertical only.
+const strip = $('strip');
+let stripY = null;
+strip.addEventListener('touchstart', (e) => { e.preventDefault(); stripY = e.touches[0].clientY; vSamples = []; strip.classList.add('on'); }, { passive: false });
+strip.addEventListener('touchmove', (e) => { e.preventDefault(); const y = e.touches[0].clientY; addScroll(0, y - stripY, e.timeStamp); stripY = y; }, { passive: false });
+const stripEnd = (e) => { e.preventDefault(); if (stripY !== null) endScroll(e.timeStamp); stripY = null; strip.classList.remove('on'); };
+strip.addEventListener('touchend', stripEnd, { passive: false });
+strip.addEventListener('touchcancel', stripEnd, { passive: false });
+</script>
+</body>
+</html>
