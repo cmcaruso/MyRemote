@@ -1,0 +1,74 @@
+import AppKit
+import CoreGraphics
+import Foundation
+import HostCore
+
+/// The Host's state as the menu shows it, and the one place commands cross onto the main actor.
+@MainActor @Observable
+final class Host {
+    /// Loopback port `tailscale serve` proxies to. Per machine: `defaults write <bundle id> port <n>`.
+    let port: Int
+    private(set) var serving = false
+    private(set) var serverError: String?
+    private(set) var remotes = 0
+    private(set) var accessibilityGranted = CGPreflightPostEventAccess()
+
+    private let injector = Injector()
+
+    init() {
+        let configured = UserDefaults.standard.integer(forKey: "port")
+        port = configured > 0 ? configured : 8484
+    }
+
+    func start() {
+        if !accessibilityGranted {
+            _ = CGRequestPostEventAccess()
+            watchAccessibility()
+        }
+
+        // Every command from every Remote goes through this stream to the injector on the main actor.
+        let (commands, continuation) = AsyncStream.makeStream(of: Command.self)
+        Task {
+            for await command in commands { injector.apply(command) }
+        }
+
+        let server = Server(
+            remoteDirectory: Self.remoteDirectory(),
+            port: port,
+            commands: continuation,
+            onRemote: { [weak self] delta in await MainActor.run { self?.remotes += delta } }
+        )
+        Task {
+            serving = true
+            do {
+                try await server.run()
+            } catch {
+                serverError = "\(error)"
+            }
+            serving = false
+        }
+    }
+
+    func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    /// Accessibility is granted in System Settings while the Host runs; notice it without a restart.
+    private func watchAccessibility() {
+        Task {
+            while !accessibilityGranted {
+                try? await Task.sleep(for: .seconds(2))
+                accessibilityGranted = CGPreflightPostEventAccess()
+            }
+        }
+    }
+
+    /// The Remote's files: inside the app bundle, or `./remote` when run with `swift run` from the repo root.
+    private static func remoteDirectory() -> String {
+        if let bundled = Bundle.main.resourceURL?.appending(path: "remote"),
+           FileManager.default.fileExists(atPath: bundled.path(percentEncoded: false)) {
+            return bundled.path(percentEncoded: false)
+        }
+        return FileManager.default.currentDirectoryPath + "/remote"
+    }
+}

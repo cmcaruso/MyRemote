@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- Solid, not black-translucent: translucent leaves the iOS 27 Home Screen web view one status bar short.
+       iOS reads this only when the icon is added. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Remote">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>MyRemote</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main id="app" class="console">
+    <div class="padarea">
+      <div class="pad" id="pad"><span class="conn" id="conn" title="Disconnected"></span></div>
+      <div class="strip" aria-hidden="true">⇕</div>
+    </div>
+    <nav class="modes" id="modes">
+      <button data-mode="trackpad">Trackpad</button>
+      <button data-mode="keyboard">Keys</button>
+      <button data-mode="media">Media</button>
+      <button data-mode="presentation">Present</button>
+    </nav>
+    <section class="panel" id="panel"></section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
