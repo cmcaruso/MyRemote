@@ -14,6 +14,10 @@ final class Host {
     private(set) var accessibilityGranted = CGPreflightPostEventAccess()
 
     private let injector = Injector()
+    private let volume = Volume()
+    private let clients = Clients()
+    /// The last volume state pushed; CoreAudio reports one change several times.
+    private var lastVolume: String?
 
     init() {
         let configured = UserDefaults.standard.integer(forKey: "port")
@@ -26,21 +30,31 @@ final class Host {
             watchAccessibility()
         }
 
-        // Every command from every Remote goes through this stream to the injector on the main actor.
+        // Every command from every Remote goes through this stream to the main actor.
         let (commands, continuation) = AsyncStream.makeStream(of: Command.self)
         Task {
-            for await command in commands { injector.apply(command) }
+            for await command in commands {
+                if case let .setVolume(level) = command {
+                    volume.set(level)
+                } else {
+                    injector.apply(command)
+                }
+            }
         }
+
+        // Keep every Remote's volume slider in step with the Mac.
+        volume.onChange = { [weak self] in self?.pushVolume() }
 
         let server = Server(
             remoteDirectory: Self.remoteDirectory(),
             port: port,
             commands: continuation,
+            clients: clients,
             onRemote: { [weak self] delta in
                 await MainActor.run {
                     guard let self else { return }
                     self.remotes += delta
-                    if delta < 0 { self.injector.remoteLeft() }
+                    if delta < 0 { self.injector.remoteLeft() } else { self.pushVolume(force: true) }
                 }
             }
         )
@@ -53,6 +67,15 @@ final class Host {
             }
             serving = false
         }
+    }
+
+    /// Sends the volume state to every Remote; `force` also repeats an unchanged state, for a new Remote.
+    private func pushVolume(force: Bool = false) {
+        let text = volume.current().encoded()
+        guard force || text != lastVolume else { return }
+        lastVolume = text
+        let clients = clients
+        Task { await clients.broadcast(text) }
     }
 
     func openAccessibilitySettings() {

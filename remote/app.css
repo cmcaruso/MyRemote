@@ -107,6 +107,23 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   background: #141416;
   border-radius: 14px 14px var(--corner) var(--corner);
 }
+.panel.filled { display: block; padding: 12px 14px 22px; text-align: initial; color: var(--text); }
+
+/* Media Mode */
+.media { display: flex; flex-direction: column; gap: 14px; }
+.transport { display: flex; justify-content: center; align-items: center; gap: 18px; }
+.transport button { width: 64px; height: 64px; border-radius: 50%; background: var(--panel); font-size: 24px; }
+.transport .play { width: 84px; height: 84px; background: var(--text); color: #000; font-size: 30px; }
+.volume { display: flex; align-items: center; gap: 6px; }
+.volume > button { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--panel); font-size: 22px; }
+.volume > button.on { background: var(--bad); }
+.slider { position: relative; flex: 1; height: 48px; overflow: hidden; background: var(--panel); border-radius: 12px; touch-action: none; }
+.slider .fill { position: absolute; inset: 0 auto 0 0; background: #0a84ff; }
+.slider.muted .fill { background: var(--panel-2); }
+.slider.fixed { opacity: .5; }
+.slider span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+.transport button:active, .volume > button:active { background: var(--panel-2); }
+
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */
 .console.full .panel { display: none; }
 .console.full .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
