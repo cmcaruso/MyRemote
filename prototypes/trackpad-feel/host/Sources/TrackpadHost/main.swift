@@ -24,7 +24,37 @@ struct Msg: Decodable {
     var vx: Double?
     var vy: Double?
     var decay: Double?
+    var ts: Double?   // [DEBUG-lat] phone send time (performance.now ms)
+    var age: Double?  // [DEBUG-lat] phone touch event → send, ms
 }
+
+/// [DEBUG-lat] One-way delay of motion messages relative to the fastest one seen (cancels the clock offset),
+/// plus arrival gaps while a finger is moving.
+final class Uplink: @unchecked Sendable {
+    var minOff = Double.infinity, lastArrival = 0.0, lastTs = 0.0
+    var excess: [Double] = [], gaps: [Double] = [], ages: [Double] = []
+    var lastReport = 0.0
+    func add(ts: Double, age: Double) {
+        let now = Date().timeIntervalSince1970 * 1000
+        if ts < lastTs { minOff = .infinity }  // page reloaded
+        let off = now - ts
+        minOff = min(minOff, off)
+        excess.append(off - minOff)
+        ages.append(age)
+        if ts - lastTs < 60 { gaps.append(now - lastArrival) }  // same stroke: phone sent within 60 ms of the last one
+        lastArrival = now
+        lastTs = ts
+        if now - lastReport > 5000 && excess.count >= 20 { report(now) }
+    }
+    func report(_ now: Double) {
+        func pct(_ a: [Double], _ p: Double) -> String { let s = a.sorted(); return String(format: "%.0f", s[min(s.count - 1, Int(p * Double(s.count)))]) }
+        let big = gaps.filter { $0 > 50 }.count
+        log("[DEBUG-lat] uplink n=\(excess.count) excess p50=\(pct(excess, 0.5)) p95=\(pct(excess, 0.95)) max=\(pct(excess, 1)) ms | gaps>50ms=\(big)/\(gaps.count) maxgap=\(gaps.isEmpty ? "-" : pct(gaps, 1)) | phone age p50=\(pct(ages, 0.5)) p95=\(pct(ages, 0.95))")
+        excess.removeAll(); gaps.removeAll(); ages.removeAll()
+        lastReport = now
+    }
+}
+let uplink = Uplink()
 
 func log(_ s: String) {
     let ts = Date().formatted(.dateTime.hour().minute().second())
@@ -175,6 +205,7 @@ wsRouter.ws("/ws") { inbound, outbound, context in
     for try await message in inbound.messages(maxSize: 1 << 16) {
         guard case .text(let text) = message,
               let m = try? decoder.decode(Msg.self, from: Data(text.utf8)) else { continue }
+        if let ts = m.ts { uplink.add(ts: ts, age: m.age ?? 0) }
         switch m.t {
         case "m": await injector.move(m.dx ?? 0, m.dy ?? 0)
         case "c": await injector.click(right: m.b == 1, n: m.n ?? 1)

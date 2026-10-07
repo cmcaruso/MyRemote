@@ -80,6 +80,7 @@ const DEFAULTS = {
   holdMs: 350,
   dbl: true,      // double-tap-and-drag
   dblMs: 280,     // window for the second tap
+  wake: false,    // [DEBUG-lat] fast pings while touching, to keep the phone's Wi-Fi awake
 };
 let P = { ...DEFAULTS };
 try { Object.assign(P, JSON.parse(localStorage.getItem('tp-params') || '{}')); } catch {}
@@ -89,7 +90,7 @@ const SLIDERS = [
   ['cap', 'max ×', 1, 12, 0.5], ['scroll', 'scroll speed', 0.3, 4, 0.1], ['decay', 'momentum', 0.85, 0.99, 0.005],
   ['tapMs', 'tap ms', 100, 350, 10], ['slop', 'slop px', 2, 24, 1], ['holdMs', 'hold ms', 150, 900, 25], ['dblMs', 'dbl-tap ms', 150, 450, 10],
 ];
-const CHECKS = [['momentum', 'momentum'], ['invert', 'invert scroll'], ['hold', 'hold-drag'], ['dbl', 'double-tap-drag']];
+const CHECKS = [['momentum', 'momentum'], ['invert', 'invert scroll'], ['hold', 'hold-drag'], ['dbl', 'double-tap-drag'], ['wake', 'keep-awake']];
 
 const $ = (id) => document.getElementById(id);
 const tune = $('tune');
@@ -130,20 +131,28 @@ function drawCurve() {
 
 // ---------- transport ----------
 let ws, sentCount = 0;
-const pending = { mx: 0, my: 0, sx: 0, sy: 0 };
+const pending = { mx: 0, my: 0, sx: 0, sy: 0, t0: 0 };
+let evT = 0; // [DEBUG-lat] timestamp of the touch event being handled
+const ages = []; // [DEBUG-lat] touch event → send, ms
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   ws.onopen = () => { $('conn').classList.add('on'); send({ t: 'cfg', ...P, connect: true }); };
   ws.onclose = () => { $('conn').classList.remove('on'); setTimeout(connect, 1000); };
-  ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'p') rtt(performance.now() - m.ts); };
+  ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'p') rtt(performance.now() - m.ts, m.a); };
 }
 function send(m) { if (ws && ws.readyState === 1) { ws.send(JSON.stringify(m)); sentCount++; } }
 const r2 = (x) => Math.round(x * 100) / 100;
 function flush() {
-  if (pending.mx || pending.my) { send({ t: 'm', dx: r2(pending.mx), dy: r2(pending.my) }); pending.mx = pending.my = 0; }
-  if (pending.sx || pending.sy) { send({ t: 's', p: 'c', dx: r2(pending.sx), dy: r2(pending.sy) }); pending.sx = pending.sy = 0; }
+  if (!pending.t0) return;
+  const ts = performance.now(), age = ts - pending.t0; // [DEBUG-lat]
+  ages.push(age); if (ages.length > 300) ages.shift();
+  if (pending.mx || pending.my) { send({ t: 'm', dx: r2(pending.mx), dy: r2(pending.my), ts: r2(ts), age: r2(age) }); pending.mx = pending.my = 0; }
+  if (pending.sx || pending.sy) { send({ t: 's', p: 'c', dx: r2(pending.sx), dy: r2(pending.sy), ts: r2(ts), age: r2(age) }); pending.sx = pending.sy = 0; }
+  pending.t0 = 0;
 }
-function now(m) { flush(); send(m); } // discrete events: flush motion first so they land in order
+function now(m) { flush(); send(m); }
+// iOS already delivers touchmove once per frame, so send right away; the rAF loop only drains what backpressure held back.
+function flushSoon() { if (ws && ws.readyState === 1 && ws.bufferedAmount === 0) flush(); } // discrete events: flush motion first so they land in order
 (function frame() {
   if (ws && ws.readyState === 1 && ws.bufferedAmount === 0) flush(); // backpressure: keep summing while the socket is behind
   requestAnimationFrame(frame);
@@ -151,14 +160,24 @@ function now(m) { flush(); send(m); } // discrete events: flush motion first so 
 
 const rtts = [];
 let pingId = 0;
-function rtt(ms) { rtts.push(ms); if (rtts.length > 120) rtts.shift(); }
+const rttsActive = []; // [DEBUG-lat] pings sent while a finger is down
+function rtt(ms, active) { const a = active ? rttsActive : rtts; a.push(ms); if (a.length > 120) a.shift(); }
+const touching = () => G !== 'idle' || stripY !== null;
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
-setInterval(() => send({ t: 'p', id: ++pingId, ts: performance.now() }), 500);
+setInterval(() => { if (!touching()) send({ t: 'p', id: ++pingId, ts: performance.now() }); }, 500);
+// [DEBUG-lat] while touching: ping every 100 ms normally, every 20 ms with keep-awake on
+let lastActivePing = 0;
+setInterval(() => { const t = performance.now(); if (touching() && t - lastActivePing >= (P.wake ? 20 : 100)) { lastActivePing = t; send({ t: 'p', id: ++pingId, ts: t, a: 1 }); } }, 10);
 setInterval(() => {
   if (rtts.length) { $('p50').textContent = pct(rtts, 0.5).toFixed(0); $('p95').textContent = pct(rtts, 0.95).toFixed(0); }
   $('rate').textContent = sentCount; sentCount = 0;
 }, 1000);
-setInterval(() => { if (rtts.length) send({ t: 'stat', p50: r2(pct(rtts, 0.5)), p95: r2(pct(rtts, 0.95)), max: r2(Math.max(...rtts)), n: rtts.length }); }, 15000);
+setInterval(() => {
+  if (rtts.length) send({ t: 'stat', p50: r2(pct(rtts, 0.5)), p95: r2(pct(rtts, 0.95)), max: r2(Math.max(...rtts)), n: rtts.length });
+  // [DEBUG-lat] round trips while touching, and phone-side event → send delay
+  if (rttsActive.length) send({ t: 'stat', active: 1, wake: P.wake, p50: r2(pct(rttsActive, 0.5)), p95: r2(pct(rttsActive, 0.95)), max: r2(Math.max(...rttsActive)), n: rttsActive.length, age50: r2(pct(ages, 0.5)), age95: r2(pct(ages, 0.95)) });
+  rttsActive.length = 0; ages.length = 0;
+}, 5000);
 connect();
 
 // ---------- gestures ----------
@@ -178,10 +197,12 @@ function addMove(dx, dy, dtMs) {
   const g = gainAt(v);
   $('gain').textContent = g.toFixed(1);
   pending.mx += dx * g; pending.my += dy * g;
+  pending.t0 ||= evT;
 }
 function addScroll(dx, dy, t) {
   const k = P.scroll * (P.invert ? -1 : 1);
   pending.sx += dx * k; pending.sy += dy * k;
+  pending.t0 ||= evT;
   vSamples.push({ t, dx: dx * k, dy: dy * k });
   while (vSamples.length && t - vSamples[0].t > 80) vSamples.shift();
 }
@@ -216,6 +237,7 @@ pad.addEventListener('touchstart', (e) => {
 
 pad.addEventListener('touchmove', (e) => {
   e.preventDefault();
+  evT = e.timeStamp;
   const t = e.timeStamp;
   if ((G === 'one' || G === 'drag') && e.touches.length === 1) {
     const p = e.touches[0];
@@ -232,6 +254,7 @@ pad.addEventListener('touchmove', (e) => {
     if (G === 'two' && Math.hypot(dx, dy) > P.slop) setG('scroll');
     if (G === 'scroll') { addScroll(dx, dy, t); centroid = c; }
   }
+  flushSoon();
 }, { passive: false });
 
 function padEnd(e) {
@@ -263,7 +286,7 @@ pad.addEventListener('touchcancel', padEnd, { passive: false });
 const strip = $('strip');
 let stripY = null;
 strip.addEventListener('touchstart', (e) => { e.preventDefault(); stripY = e.touches[0].clientY; vSamples = []; strip.classList.add('on'); }, { passive: false });
-strip.addEventListener('touchmove', (e) => { e.preventDefault(); const y = e.touches[0].clientY; addScroll(0, y - stripY, e.timeStamp); stripY = y; }, { passive: false });
+strip.addEventListener('touchmove', (e) => { e.preventDefault(); evT = e.timeStamp; const y = e.touches[0].clientY; addScroll(0, y - stripY, e.timeStamp); stripY = y; flushSoon(); }, { passive: false });
 const stripEnd = (e) => { e.preventDefault(); if (stripY !== null) endScroll(e.timeStamp); stripY = null; strip.classList.remove('on'); };
 strip.addEventListener('touchend', stripEnd, { passive: false });
 strip.addEventListener('touchcancel', stripEnd, { passive: false });
