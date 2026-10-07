@@ -5,16 +5,19 @@ import CoreGraphics
 /// Points are in global display coordinates (origin top-left of the main display, y down),
 /// the space `CGEvent` locations and `CGDisplayBounds` use.
 public struct Pointer: Sendable {
-    /// The last point posted. The system reports the cursor on whole pixels, so moving on from
-    /// this instead keeps the fractions of slow finger motion.
-    private var lastPosted: CGPoint?
+    /// Where this pointer has put the cursor, oldest first: the point it started from, then each point posted.
+    /// The system reports the cursor rounded and late (a burst of frames outruns it), so as long as the
+    /// reported cursor is somewhere on this trail, moving on from the last point keeps every delta.
+    private var trail: [CGPoint] = []
+    private static let trailLength = 64
 
     public init() {}
 
     /// The point to post for a move by `delta` from `cursor`, the cursor's current location.
     public mutating func move(from cursor: CGPoint, by delta: CGVector, displays: [CGRect]) -> CGPoint {
-        var base = cursor
-        if let last = lastPosted, abs(last.x - cursor.x) < 1.5, abs(last.y - cursor.y) < 1.5 { base = last }
+        let onTrail = trail.contains { abs($0.x - cursor.x) < 1.5 && abs($0.y - cursor.y) < 1.5 }
+        if !onTrail { trail = [cursor] }  // Something else moved the cursor: follow it.
+        let base = trail[trail.count - 1]
 
         var target = CGPoint(x: base.x + delta.dx, y: base.y + delta.dy)
         if !displays.contains(where: { $0.contains(target) }),
@@ -25,7 +28,8 @@ public struct Pointer: Sendable {
                 y: min(max(target.y, display.minY), display.maxY - 1)
             )
         }
-        lastPosted = target
+        trail.append(target)
+        if trail.count > Self.trailLength { trail.removeFirst(trail.count - Self.trailLength) }
         return target
     }
 }

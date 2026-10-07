@@ -31,6 +31,19 @@ struct PointerTests {
         #expect(abs(posted.y - 97) < 0.001)
     }
 
+    @Test func keepsAllMotionFromABurstTheSystemHasNotCaughtUpWith() {
+        // Frames queued behind a Wi-Fi stall arrive at once; the reported cursor lags behind what was posted.
+        var pointer = Pointer()
+        let start = CGPoint(x: 400, y: 300)
+        var posted: [CGPoint] = []
+        for i in 0..<20 {
+            // Stale for the first frames, then catching up a few posts behind.
+            let cursor = i < 5 ? start : posted[i - 4]
+            posted.append(pointer.move(from: cursor, by: CGVector(dx: 5, dy: 2.5), displays: [main]))
+        }
+        #expect(posted.last == CGPoint(x: 500, y: 350))
+    }
+
     @Test func followsTheCursorWhenSomethingElseMovedIt() {
         var pointer = Pointer()
         _ = pointer.move(from: CGPoint(x: 100, y: 100), by: CGVector(dx: 0.5, dy: 0.5), displays: [main])
