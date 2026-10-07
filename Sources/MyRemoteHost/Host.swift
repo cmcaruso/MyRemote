@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 import HostCore
+import ServiceManagement
 
 /// The Host's state as the menu shows it, and the one place commands cross onto the main actor.
 @MainActor @Observable
@@ -12,6 +13,10 @@ final class Host {
     private(set) var serverError: String?
     private(set) var remotes = 0
     private(set) var accessibilityGranted = CGPreflightPostEventAccess()
+    /// Whether `tailscale serve` reaches the Host; nil until the first check.
+    private(set) var serve: ServeCheck?
+    private(set) var loginItem = LoginItem.status
+    private(set) var loginItemError: String?
 
     private let injector = Injector()
     private let volume = Volume()
@@ -55,6 +60,7 @@ final class Host {
                     guard let self else { return }
                     self.remotes += delta
                     if delta < 0 { self.injector.remoteLeft() } else { self.pushVolume(force: true) }
+                    self.checkServe()
                 }
             }
         )
@@ -67,6 +73,39 @@ final class Host {
             }
             serving = false
         }
+
+        watchStatus()
+    }
+
+    /// Serve and the login item change outside the Host (Terminal, System Settings), so look again now and then.
+    private func watchStatus() {
+        Task {
+            while true {
+                checkServe()
+                loginItem = LoginItem.status
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+    }
+
+    private func checkServe() {
+        let port = port
+        Task { serve = await Tailscale.checkServe(port: port) }
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LoginItem.set(enabled)
+            loginItemError = nil
+        } catch {
+            loginItemError = error.localizedDescription
+        }
+        loginItem = LoginItem.status
+    }
+
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// Sends the volume state to every Remote; `force` also repeats an unchanged state, for a new Remote.
