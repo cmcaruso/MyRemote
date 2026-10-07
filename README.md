@@ -25,28 +25,19 @@ Status: early. The walking skeleton works (one finger on the Remote moves the Ma
 
    `tailscale serve status` shows your Mac's address, `https://<your-mac>.<your-tailnet>.ts.net`.
 
-### 2. Signing
-
-macOS remembers the Accessibility permission by the app's code signature. If the app is signed ad hoc, that signature changes on every build, and macOS asks again each time. To avoid that, make a stable self-signed identity once:
-
-1. Open **Keychain Access** → **Keychain Access → Certificate Assistant → Create a Certificate…**
-2. Set **Name** to `MyRemote Signing`, **Identity Type** to *Self-Signed Root*, and **Certificate Type** to *Code Signing*. Tick **Let me override defaults**.
-3. Set **Validity Period** to `3650` days and keep the other defaults. Save it in the *login* keychain.
-4. Check it's there: `security find-identity -p codesigning` lists `MyRemote Signing`.
-
-To use another name or bundle ID, copy `scripts/signing.local.example` to `scripts/signing.local` (it's git-ignored) and edit it. To skip this step, set `MYREMOTE_SIGN_IDENTITY=-`: the app is then signed ad hoc and will ask for Accessibility after every rebuild.
-
-### 3. Build and run
+### 2. Build and run
 
 ```sh
 scripts/bundle.sh --run
 ```
 
-This builds `build/MyRemote.app`, signs it, and opens it. A hand icon appears in the menu bar. The first time, macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted". You can move the app to `/Applications` if you like.
+This builds `build/MyRemote.app` and opens it. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted". You can move the app to `/Applications` if you like.
+
+The app is signed ad hoc, so macOS asks for Accessibility again after every rebuild (`--run` clears the old entry first). If you rebuild often, sign with a code-signing identity of your own: copy `scripts/signing.local.example` to `scripts/signing.local` (it's git-ignored) and set `MYREMOTE_SIGN_IDENTITY`. The grant then survives rebuilds.
 
 The Host listens on `127.0.0.1:8484`. To use another port, run `defaults write io.github.cmcaruso.myremote port 9000` (or the bundle ID you set), and point `tailscale serve` at the same port.
 
-### 4. Add the Remote to the iPhone
+### 3. Add the Remote to the iPhone
 
 1. On the iPhone, open `https://<your-mac>.<your-tailnet>.ts.net` in Safari.
 2. Tap Share → **Add to Home Screen**, then open the Remote from its icon. Always use it from there, not from a Safari tab.
@@ -59,13 +50,13 @@ node --test 'remote/test/*.test.js'          # Remote logic
 swift run MyRemoteHost                       # run the Host unbundled, serving ./remote
 ```
 
-When unbundled, macOS attributes Accessibility to your terminal app.
+When unbundled, the Host uses your terminal app's Accessibility grant, so rebuilding needs no new grant.
 
 The layout:
 
 - `Sources/HostCore`: the Host's pure logic (wire protocol, pointer math). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/` and the `/ws` WebSocket, and posts input with `CGEvent`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
-- `scripts/bundle.sh`: builds and signs the `.app`.
+- `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 
 `CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Pairing, Laser).

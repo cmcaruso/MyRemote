@@ -1,3 +1,4 @@
 # Copy to scripts/signing.local (untracked) to override the defaults for this Mac.
-# MYREMOTE_SIGN_IDENTITY="MyRemote Signing"
+# A stable code-signing identity from your keychain keeps the Accessibility grant across rebuilds:
+# MYREMOTE_SIGN_IDENTITY="My Code Signing Cert"
 # MYREMOTE_BUNDLE_ID="io.github.cmcaruso.myremote"
