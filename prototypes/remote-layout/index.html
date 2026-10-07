@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway, not production. Answers issue #6:
+  "What should the Remote's layout and Mode switching look like?"
+  Four variants of the whole Remote on one page, switchable via ?variant=A|B|C|D
+  and the magenta pill at the top. Nothing is sent to the Host: every touch is
+  shown in the pill as the command the Host would receive.
+  Run: node prototypes/remote-layout/serve.mjs
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Remote proto">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Remote Layout Prototype</title>
+  <link rel="stylesheet" href="proto.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="proto.js"></script>
+</body>
+</html>
