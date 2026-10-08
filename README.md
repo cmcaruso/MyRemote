@@ -83,7 +83,7 @@ The Host plays your voice into an audio output that you pick in the menu under *
 brew install --cask blackhole-2ch
 ```
 
-It asks for your password. The Host picks **BlackHole 2ch** by default once it's installed. In Teams (or Zoom, Meet, …), choose **BlackHole 2ch** as the microphone. To play your voice out loud instead, for example through a room's speakers, pick that output in the menu. The menu says whether the Phone Mic is live and where it goes.
+It asks for your password. The Host picks **BlackHole 2ch** by default once it's installed. In Teams (or Zoom, Meet, …), choose **BlackHole 2ch** as the microphone. To play your voice out loud instead, for example through a room's speakers, pick that output in the menu. The Host never plays it through an output you didn't pick: until BlackHole is installed or you pick one, the Mac doesn't play the Phone Mic at all, so you don't hear yourself out of the Mac's speakers. The menu says whether the Phone Mic is live and where it goes.
 
 - Expect about a tenth to a fifth of a second of delay, depending on the network.
 - iOS stops the mic when the Remote goes to the background or the phone locks. It starts again when you come back.

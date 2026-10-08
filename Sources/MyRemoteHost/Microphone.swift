@@ -44,7 +44,8 @@ final class MicFeed: Sendable {
 }
 
 /// Plays the Phone Mic into the chosen output, BlackHole 2ch by default, without touching the Mac's
-/// default output. The engine runs only while a Remote streams, so the device isn't held open otherwise.
+/// default output. Never the speakers unless picked: the user would hear themselves, and the phone would
+/// pick that up again. The engine runs only while a Remote streams, so the device isn't held open otherwise.
 @MainActor @Observable
 final class Microphone {
     nonisolated let feed = MicFeed()
@@ -55,7 +56,6 @@ final class Microphone {
     private(set) var error: String?
     /// The output picked in the menu, by UID; nil until the user picks one.
     private(set) var chosen = UserDefaults.standard.string(forKey: "micOutput")
-    private var defaultOutput = AudioObjectID(kAudioObjectUnknown)
 
     @ObservationIgnored private var engine: AVAudioEngine?
     @ObservationIgnored private var engineObserver: NSObjectProtocol?
@@ -65,30 +65,21 @@ final class Microphone {
         mSelector: kAudioHardwarePropertyDevices,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain)
-    private static var defaultOutputAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain)
 
     init() {
-        for address in [Self.devicesAddress, Self.defaultOutputAddress] {
-            var address = address
-            AudioObjectAddPropertyListenerBlock(Self.system, &address, .main) { [weak self] _, _ in
-                MainActor.assumeIsolated { self?.devicesChanged() }
-            }
+        AudioObjectAddPropertyListenerBlock(Self.system, &Self.devicesAddress, .main) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.devicesChanged() }
         }
-        refreshDevices()
+        outputs = Self.outputDevices()
     }
 
     var live: Bool { rate != nil }
 
     var blackHoleInstalled: Bool { outputs.contains(where: \.isBlackHole) }
 
-    /// Where the Phone Mic plays: the chosen output, else BlackHole, else the Mac's default output.
+    /// Where the Phone Mic plays: the chosen output, else BlackHole, else nowhere.
     var output: OutputDevice? {
-        outputs.first { $0.id == chosen }
-            ?? outputs.first(where: \.isBlackHole)
-            ?? outputs.first { $0.object == defaultOutput }
+        outputs.first { $0.id == chosen } ?? outputs.first(where: \.isBlackHole)
     }
 
     func choose(_ id: String) {
@@ -107,16 +98,8 @@ final class Microphone {
 
     private func devicesChanged() {
         let before = output
-        refreshDevices()
-        if output != before { restart() }
-    }
-
-    private func refreshDevices() {
-        var id = AudioObjectID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        AudioObjectGetPropertyData(Self.system, &Self.defaultOutputAddress, 0, nil, &size, &id)
-        defaultOutput = id
         outputs = Self.outputDevices()
+        if output != before { restart() }
     }
 
     private func restart() {
@@ -154,7 +137,7 @@ final class Microphone {
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.refreshDevices()
+                self?.outputs = Self.outputDevices()
                 self?.restart()
             }
         }

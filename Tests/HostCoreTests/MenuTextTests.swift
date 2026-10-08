@@ -38,7 +38,7 @@ struct MenuTextTests {
         #expect(MenuText.phoneMic(live: true, output: "BlackHole 2ch", blackHoleInstalled: true)
             == [MenuLine("Phone Mic: live → BlackHole 2ch")])
         #expect(MenuText.phoneMic(live: true, output: nil, blackHoleInstalled: true)
-            == [MenuLine("Phone Mic: no output to send it to")])
+            == [MenuLine("Phone Mic: no output picked, the Mac doesn't play it")])
     }
 
     @Test func offersToInstallBlackHoleForCalls() {

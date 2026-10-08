@@ -42,7 +42,7 @@ public enum MenuText {
     /// microphone a call can pick, only outputs like the speakers.
     public static func phoneMic(live: Bool, output: String?, blackHoleInstalled: Bool) -> [MenuLine] {
         let status = switch (live, output) {
-        case (_, nil): "Phone Mic: no output to send it to"
+        case (_, nil): "Phone Mic: no output picked, the Mac doesn't play it"
         case let (true, output?): "Phone Mic: live → \(output)"
         case let (false, output?): "Phone Mic: off, sends to \(output)"
         }
