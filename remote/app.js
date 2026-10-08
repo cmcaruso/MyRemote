@@ -1,7 +1,7 @@
 import { createFlip } from './flip.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
-import { createMicEncoder, shouldDrop } from './mic.js';
+import { createGate, createHowlDetector, createMicEncoder, placeNotch, shouldDrop } from './mic.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -233,6 +233,7 @@ function renderSettings() {
   };
   segmented('Laser', [['motion', 'Motion'], ['drag', 'Drag']], steer, setSteer);
   segmented('Upside down', [['auto', 'Auto'], ['off', 'Off']], flipSetting, setFlip);
+  segmented('Echo guard', [['on', 'On'], ['off', 'Off']], guard, setGuard);
 }
 
 function openSettings() {
@@ -244,6 +245,7 @@ document.getElementById('reset').addEventListener('click', () => {
   params = { ...DEFAULTS };
   setSteer('motion');
   setFlip('auto');
+  setGuard('on');
   saveParams();
   renderSettings();
 });
@@ -728,7 +730,8 @@ micButton.addEventListener('click', () => {
 async function captureMic(m) {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      // No auto-gain: in the pauses it turns up the room, and through a room's speakers, the Phone Mic itself.
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
     });
     if (mic !== m) {
       for (const track of stream.getTracks()) track.stop();
@@ -737,16 +740,29 @@ async function captureMic(m) {
     m.stream = stream;
     await m.module;
     if (mic !== m) return;
-    const encoder = createMicEncoder({ inRate: m.context.sampleRate });
-    const tap = new AudioWorkletNode(m.context, 'mic-tap');
+    const { context } = m;
+    const encoder = createMicEncoder({ inRate: context.sampleRate });
+    const gate = createGate({ rate: context.sampleRate });
+    const tap = new AudioWorkletNode(context, 'mic-tap');
     // Safari runs a worklet only when it leads to the output, so it does, silently.
-    const silent = m.context.createGain();
+    const silent = context.createGain();
     silent.gain.value = 0;
-    m.source = m.context.createMediaStreamSource(stream);
-    m.source.connect(tap).connect(silent).connect(m.context.destination);
+    m.source = context.createMediaStreamSource(stream);
+    // The echo guard's filters: a low cut, then notches the howl detector tunes, flat until it does.
+    const lowCut = new BiquadFilterNode(context, { type: 'highpass', frequency: 100 });
+    m.notches = Array.from({ length: 4 }, () => ({
+      frequency: null,
+      filter: new BiquadFilterNode(context, { type: 'peaking', Q: 30, gain: 0 }),
+    }));
+    let chain = m.source.connect(lowCut);
+    for (const notch of m.notches) chain = chain.connect(notch.filter);
+    chain.connect(tap).connect(silent).connect(context.destination);
+    const analyser = new AnalyserNode(context, { fftSize: 2048, smoothingTimeConstant: 0 });
+    chain.connect(analyser);
+    listenForHowl(m, analyser);
     tap.port.onmessage = (e) => {
       const socket = m.socket;
-      for (const frame of encoder.push(e.data)) {
+      for (const frame of encoder.push(guard === 'on' ? gate.process(e.data) : e.data)) {
         if (socket?.readyState === WebSocket.OPEN && !shouldDrop(socket.bufferedAmount, encoder.rate)) socket.send(frame);
       }
     };
@@ -760,6 +776,39 @@ async function captureMic(m) {
       micState = 'denied';
       renderMic();
     }
+  }
+}
+
+/** Checks for feedback 20 times a second, and notches out each tone it finds. */
+function listenForHowl(m, analyser) {
+  clearInterval(m.howl);
+  const detect = createHowlDetector({ rate: m.context.sampleRate, bins: analyser.frequencyBinCount });
+  const spectrum = new Float32Array(analyser.frequencyBinCount);
+  m.howl = setInterval(() => {
+    if (guard !== 'on') return;
+    analyser.getFloatFrequencyData(spectrum);
+    const frequency = detect.update(spectrum, m.context.currentTime);
+    if (frequency === null) return;
+    const { index, gain } = placeNotch(m.notches.map((n) => n.frequency), frequency);
+    const notch = m.notches[index];
+    notch.frequency = frequency;
+    notch.filter.frequency.value = frequency;
+    notch.filter.gain.value = gain;
+  }, 50);
+}
+
+/**
+ * The echo guard, per device: through a room's speakers the Phone Mic hears itself, so a voice gate turns
+ * the room down between words and notches take out feedback as it starts. 'off' sends the mic as it is.
+ */
+let guard = (() => { try { return localStorage.getItem('micGuard') === 'off' ? 'off' : 'on'; } catch { return 'on'; } })();
+function setGuard(value) {
+  guard = value;
+  try { localStorage.setItem('micGuard', value); } catch {}
+  // Off leaves the sound alone, so the notches go flat too; they're found again when it's back on.
+  for (const notch of mic?.notches ?? []) {
+    notch.frequency = null;
+    notch.filter.gain.value = 0;
   }
 }
 
@@ -797,6 +846,7 @@ function stopMic() {
   renderMic();
   if (!m) return;
   clearTimeout(m.timer);
+  clearInterval(m.howl);
   m.socket?.close();
   for (const track of m.stream?.getTracks() ?? []) track.stop();
   m.context.close().catch(() => {});

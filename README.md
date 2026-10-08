@@ -89,6 +89,16 @@ It asks for your password. The Host picks **BlackHole 2ch** by default once it's
 - iOS stops the mic when the Remote goes to the background or the phone locks. It starts again when you come back.
 - If people in the call hear themselves, the Mac's speakers are reaching the phone. Use headphones on the Mac.
 
+**In a room, through its speakers**, the phone hears its own voice again, like any microphone. The **echo guard**, on by default, does what a microphone setup does about it:
+- iOS auto-gain is off, so the room isn't turned up between your words.
+- A low cut takes out rumble.
+- A voice gate turns everything but your voice down by 20 dB. Held at your mouth, you're far louder than the speakers.
+- When feedback starts to ring, the Remote finds the tone within half a second and notches it out, up to four tones.
+
+Turn it off under ⚙ → Present → Echo guard. Keep the phone at your mouth, and the room's volume no higher than it needs to be.
+
+The room still hears the speakers a tenth to a fifth of a second after your own voice, because the sound travels over the network. Wireless microphones are near instant. Up close, the room mostly hears you directly. At the back, the speakers carry you, but the delay can sound like a slap-back echo. The delay is shortest with the phone and the Mac on the same network, and longest on mobile data.
+
 ## Known limitations
 
 - **Reconnecting.** The Remote reconnects a second after it loses the Host. If it seems stuck after the phone or the Mac slept, close the Home Screen app and open it again.

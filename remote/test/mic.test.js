@@ -46,3 +46,101 @@ test('drops frames once the socket holds more than 100 ms', () => {
   assert.equal(shouldDrop(4800, 24000), false);
   assert.equal(shouldDrop(4801, 24000), true);
 });
+
+import { GUARD, HOWL, createGate, createHowlDetector, placeNotch } from '../mic.js';
+
+const RATE = 48000;
+const tone = (amplitude, n = 128) => Float32Array.from({ length: n }, (_, i) => amplitude * Math.sin(i / 5));
+const peakOf = (block) => Math.max(...Array.from(block, Math.abs));
+/** Runs `blocks` blocks of `amplitude` through the gate; returns the last output. */
+const feed = (gate, amplitude, blocks) => {
+  let out;
+  for (let i = 0; i < blocks; i++) out = gate.process(tone(amplitude));
+  return out;
+};
+
+test('the gate turns a steady room down', () => {
+  const gate = createGate({ rate: RATE });
+  const out = feed(gate, 0.01, 400); // about a second of room sound
+  assert.equal(gate.open, false);
+  assert.ok(peakOf(out) < 0.01 * 0.11, `${peakOf(out)}`);
+});
+
+test('a voice well over the room opens the gate at once', () => {
+  const gate = createGate({ rate: RATE });
+  feed(gate, 0.01, 400);
+  const out = feed(gate, 0.3, 3); // 8 ms in
+  assert.equal(gate.open, true);
+  assert.ok(peakOf(out) > 0.29, `${peakOf(out)}`);
+});
+
+test('the gate holds through a short pause, then closes', () => {
+  const gate = createGate({ rate: RATE });
+  feed(gate, 0.01, 400);
+  feed(gate, 0.3, 40);
+  feed(gate, 0.01, Math.floor((GUARD.hold * RATE) / 128) - 5);
+  assert.equal(gate.open, true);
+  const out = feed(gate, 0.01, 60);
+  assert.equal(gate.open, false);
+  assert.ok(peakOf(out) < 0.01 * 0.11);
+});
+
+test('in a silent room, a whisper under -55 dBFS stays shut', () => {
+  const gate = createGate({ rate: RATE });
+  feed(gate, 0.00001, 200);
+  feed(gate, 0.001, 20); // -63 dBFS RMS
+  assert.equal(gate.open, false);
+});
+
+test('a louder room is learned, so it stops holding the gate open', () => {
+  const gate = createGate({ rate: RATE });
+  feed(gate, 0.001, 200);
+  feed(gate, 0.01, 4 * 375 * 5); // the room got 20 dB louder for 20 s
+  assert.equal(gate.open, false);
+});
+
+const BINS = 1024;
+const hzPerBin = RATE / 2 / BINS;
+/** A spectrum at -90 dB with speech-like bumps, plus a tone at `bin` of `level` dB. */
+const spectrum = (bin, level) => {
+  const s = new Float32Array(BINS).fill(-90);
+  for (let i = 5; i < 200; i += 7) s[i] = -50;
+  if (bin !== null) s[bin] = level;
+  return s;
+};
+
+test('a steady tone far over the spectrum is feedback', () => {
+  const detect = createHowlDetector({ rate: RATE, bins: BINS });
+  let found = null;
+  for (let t = 0; t <= HOWL.last + 0.05; t += 0.05) found = detect.update(spectrum(100, -20), t) ?? found;
+  assert.equal(found, 100 * hzPerBin);
+});
+
+test('a tone that moves (a voice) is not', () => {
+  const detect = createHowlDetector({ rate: RATE, bins: BINS });
+  for (let i = 0, t = 0; i < 30; i++, t += 0.05) assert.equal(detect.update(spectrum(60 + (i % 3) * 4, -20), t), null);
+});
+
+test('a tone not far over the rest is not', () => {
+  const detect = createHowlDetector({ rate: RATE, bins: BINS });
+  const noisy = new Float32Array(BINS).fill(-50);
+  noisy[100] = -50 + HOWL.peak - 5;
+  for (let t = 0; t < 2; t += 0.05) assert.equal(detect.update(noisy, t), null);
+});
+
+test('it reports each ring once, then times it again', () => {
+  const detect = createHowlDetector({ rate: RATE, bins: BINS });
+  const found = [];
+  for (let t = 0; t < 1; t += 0.05) {
+    const f = detect.update(spectrum(100, -20), t);
+    if (f) found.push(f);
+  }
+  assert.equal(found.length, 2);
+});
+
+test('notches: a free one first, deeper on the same tone, the oldest when full', () => {
+  assert.deepEqual(placeNotch([null, null], 1000), { index: 0, gain: -15 });
+  assert.deepEqual(placeNotch([1000, null], 1020), { index: 0, gain: -30 });
+  assert.deepEqual(placeNotch([1000, null], 1500), { index: 1, gain: -15 });
+  assert.deepEqual(placeNotch([1000, 1500], 2500), { index: 0, gain: -15 });
+});
