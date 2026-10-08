@@ -6,6 +6,9 @@ import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
 
+/** An icon from the sprite in index.html. */
+const icon = (name, cls = '') => `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
 // ---------- Modes ----------
 
 const MODES = ['trackpad', 'keyboard', 'media', 'presentation'];
@@ -298,17 +301,17 @@ const media = document.createElement('div');
 media.className = 'media';
 media.innerHTML = `
   <div class="transport">
-    <button data-key="prev" aria-label="Previous">⏮</button>
-    <button data-key="play" class="play" aria-label="Play or pause">⏯</button>
-    <button data-key="next" aria-label="Next">⏭</button>
+    <button data-key="prev" aria-label="Previous">${icon('skip-back', 'solid')}</button>
+    <button data-key="play" class="play" aria-label="Play or pause">${icon('play-pause', 'solid')}</button>
+    <button data-key="next" aria-label="Next">${icon('skip-forward', 'solid')}</button>
   </div>
   <div class="volume">
-    <button data-key="voldown" aria-label="Volume down">−</button>
+    <button data-key="voldown" aria-label="Volume down">${icon('minus')}</button>
     <div class="slider" id="slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
       <div class="fill"></div><span></span>
     </div>
-    <button data-key="volup" aria-label="Volume up">+</button>
-    <button data-key="mute" class="mute" aria-label="Mute">🔇</button>
+    <button data-key="volup" aria-label="Volume up">${icon('plus')}</button>
+    <button data-key="mute" class="mute" aria-label="Mute">${icon('volume-x')}</button>
   </div>`;
 PANELS.media = media;
 
@@ -368,12 +371,12 @@ keys.innerHTML = `
     <button data-mod="shift" aria-label="Shift">⇧</button>
   </div>
   <div class="keyrow">
-    <button data-key="left" data-repeat aria-label="Left">←</button>
-    <button data-key="up" data-repeat aria-label="Up">↑</button>
-    <button data-key="down" data-repeat aria-label="Down">↓</button>
-    <button data-key="right" data-repeat aria-label="Right">→</button>
-    <button data-key="fwddel" data-repeat aria-label="Forward delete">⌦</button>
-    <button data-toggle class="toggle" aria-label="Show or hide the keyboard">⌨︎</button>
+    <button data-key="left" data-repeat aria-label="Left">${icon('arrow-left')}</button>
+    <button data-key="up" data-repeat aria-label="Up">${icon('arrow-up')}</button>
+    <button data-key="down" data-repeat aria-label="Down">${icon('arrow-down')}</button>
+    <button data-key="right" data-repeat aria-label="Right">${icon('arrow-right')}</button>
+    <button data-key="fwddel" data-repeat aria-label="Forward delete">${icon('fwddel')}</button>
+    <button data-toggle class="toggle" aria-label="Show or hide the keyboard">${icon('keyboard')}</button>
   </div>
   <div class="keyrow palette">
     <button data-palette="appSwitcher">App switcher</button>
@@ -497,17 +500,17 @@ renderKeys();
 const present = document.createElement('div');
 present.className = 'present';
 present.innerHTML = `
-  <button class="prev" data-slide="pgup" aria-label="Previous slide">‹ Prev</button>
+  <button class="prev" data-slide="pgup" aria-label="Previous slide">${icon('chevron-left')}Prev</button>
   <button class="black" aria-label="Black screen (hold)">Black<small>hold</small></button>
-  <button class="next" data-slide="pgdn" aria-label="Next slide">Next ›</button>
+  <button class="next" data-slide="pgdn" aria-label="Next slide">Next${icon('chevron-right')}</button>
   <div class="aim">
     <div class="aim-bar">
       <div class="aim-switch" role="tablist">
         <button data-aim="laser" role="tab">Laser</button>
         <button data-aim="pointer" role="tab">Pointer</button>
       </div>
-      <button class="mic" aria-label="Phone Mic" aria-pressed="false">Mic</button>
-      <button class="aim-gear" aria-label="Settings">⚙︎</button>
+      <button class="mic" aria-label="Phone Mic" aria-pressed="false">${icon('mic')}<span>Mic</span></button>
+      <button class="aim-gear" aria-label="Settings">${icon('gear')}</button>
     </div>
     <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>
     <div class="pointer-pad" aria-label="Trackpad for the pointer"></div>
@@ -708,7 +711,7 @@ let mic = null;
 
 const MIC_LABELS = { off: 'Mic', starting: 'Mic…', live: 'Mic on', denied: 'No mic' };
 function renderMic() {
-  micButton.textContent = MIC_LABELS[micState];
+  micButton.innerHTML = `${icon(micState === 'denied' ? 'mic-off' : 'mic')}<span>${MIC_LABELS[micState]}</span>`;
   micButton.className = `mic ${micState}`;
   micButton.setAttribute('aria-pressed', String(mic !== null));
   micDot.hidden = mic === null;
