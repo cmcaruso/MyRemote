@@ -53,9 +53,12 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 .icon.solid { fill: currentColor; }
 button .icon { pointer-events: none; }
 
-/* Size to the real web view: `fixed; inset: 0`, never lvh (iOS 27 Home Screen apps can be shorter than lvh). */
+/* Size to the real web view: `fixed; inset: 0`, never lvh (iOS 27 Home Screen apps can be shorter than lvh).
+   The layout asks the frame's shape, not the screen's: turned a quarter from landscape (see Upside down),
+   the console lays out as portrait. */
+.frame { position: fixed; inset: 0; container: frame / size; }
 .console {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: grid;
   gap: 6px;
@@ -417,38 +420,54 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 @keyframes laser-held { from { box-shadow: inset 0 0 24px rgb(255 69 58 / .25); } to { box-shadow: inset 0 0 48px rgb(255 69 58 / .45); } }
 @media (prefers-reduced-motion: reduce) { .present .zone.on, .present .mic.live { animation: none; } }
 
-/* Upside down (Present, portrait): the console turns round in place, being fixed to the whole screen.
-   The settings sheet sits in the top layer, outside the console's transform, so it turns on its own. */
-@media (orientation: portrait) {
-  .console { transition: transform .25s; }
-  .console.flipped { transform: rotate(180deg); }
-  /* At the top of the screen, which is the bottom for someone holding it upside down. */
-  .console.flipped .sheet { margin: 0 auto auto; rotate: 180deg; }
+/* Upside down (Present): the frame turns round about the screen's centre, sized as the phone is held
+   (renderFlip sets --turn, --frame-w and --frame-h). The settings sheet sits in the top layer, outside the
+   frame's turn, so it turns on its own about the same centre, and rises from the bottom as it's held. */
+.frame { transition: rotate .25s; }
+.frame[data-turn] {
+  inset: auto; left: 50%; top: 50%; width: var(--frame-w); height: var(--frame-h);
+  translate: -50% -50%; rotate: var(--turn);
 }
+.frame[data-turn] .sheet {
+  top: auto; bottom: calc(50% - var(--frame-h) / 2); width: var(--frame-w); max-height: calc(var(--frame-h) * .88);
+  transform-origin: 50% calc(100% - var(--frame-h) / 2); rotate: var(--turn);
+}
+.frame[data-turn] .sheet form { max-height: calc(var(--frame-h) * .88); }
+/* Turned a quarter from landscape, the Dynamic Island is at the console's bottom. */
+.frame[data-turn="90"] .console, .frame[data-turn="-90"] .console { padding-bottom: max(4px, env(safe-area-inset-left), env(safe-area-inset-right)); }
 
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */
 .console.full .panel { display: none; }
 .console.full .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
 .console.full .modes button { height: 50px; }
 
-/* Landscape: the Mode bar becomes a vertical rail on the right, clear of the Dynamic Island. */
-@media (orientation: landscape) {
+/* Landscape: the Mode bar becomes a vertical rail on the right. The side the phone's top is on (renderFlip
+   says which) stays clear of the Dynamic Island; the corners on the other side follow the screen's. */
+@container frame (orientation: landscape) {
   .console {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 64px;
     grid-template-rows: minmax(0, 1fr);
     grid-template-areas: "pad panel modes";
     padding-right: max(4px, env(safe-area-inset-right));
+    --corner-l: var(--corner);
+    --corner-r: 14px;
+  }
+  .frame[data-island="left"] .console {
+    padding-right: 4px;
+    padding-left: max(4px, env(safe-area-inset-left));
+    --corner-l: 14px;
+    --corner-r: var(--corner);
   }
   .console.full { grid-template-columns: minmax(0, 1fr) 64px; grid-template-areas: "pad modes"; }
-  .pad { border-radius: var(--corner) 14px 14px var(--corner); }
+  .pad { border-radius: var(--corner-l) 14px 14px var(--corner-l); }
   .strip, .panel { border-radius: 14px; }
-  .modes, .console.full .modes { flex-direction: column; gap: 4px; padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
+  .modes, .console.full .modes { flex-direction: column; gap: 4px; padding: 14px 4px; border-radius: 14px var(--corner-r) var(--corner-r) 14px; }
   .modes button, .console.full .modes button { height: auto; }
   .modes button span { display: none; }
   .modes button .icon { width: 24px; height: 24px; }
   .console.presenting { grid-template-columns: minmax(0, 1fr) 64px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "panel modes"; }
-  .console.presenting .panel.filled { border-radius: var(--corner) 14px 14px var(--corner); }
-  .console.presenting .modes { padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
+  .console.presenting .panel.filled { border-radius: var(--corner-l) 14px 14px var(--corner-l); }
+  .console.presenting .modes { padding: 14px 4px; border-radius: 14px var(--corner-r) var(--corner-r) 14px; }
   .console.presenting .modes button { height: auto; }
   .present {
     grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.6fr) minmax(0, 1.2fr);

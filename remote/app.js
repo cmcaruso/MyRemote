@@ -1,5 +1,5 @@
 import { DOTS, createDotGrid } from './dotgrid.js';
-import { createFlip } from './flip.js';
+import { createFlip, turnFor, unturn } from './flip.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
 import { createGate, createHowlDetector, createMicEncoder, isPhoneMic, placeNotch, shouldDrop } from './mic.js';
@@ -17,6 +17,8 @@ const MODES = ['trackpad', 'keyboard', 'media', 'presentation'];
 const PANELS = {};
 
 const app = document.getElementById('app');
+/** Holds the console, and turns it round when the phone is held upside down. */
+const frame = document.getElementById('frame');
 const panel = document.getElementById('panel');
 const modeButtons = document.querySelectorAll('#modes button');
 
@@ -382,9 +384,7 @@ function createDotLayer(el) {
       if (!live()) return;
       // In the surface's own pixels, which turn round with the console when it's upside down.
       const box = el.getBoundingClientRect();
-      const fingers = Array.from(e.targetTouches, (t) => (flipped
-        ? { x: box.right - t.clientX, y: box.bottom - t.clientY }
-        : { x: t.clientX - box.left, y: t.clientY - box.top }));
+      const fingers = Array.from(e.targetTouches, (t) => unturn(t.clientX, t.clientY, box, turn));
       if (fingers.length) {
         centre = { x: fingers.reduce((sum, f) => sum + f.x, 0) / fingers.length, y: fingers.reduce((sum, f) => sum + f.y, 0) / fingers.length };
       }
@@ -410,8 +410,8 @@ function rebuildGestures() {
 }
 rebuildGestures();
 
-/** Where a touch is as the user sees it: mirrored while the Remote is upside down, so motion follows the thumb. */
-const point = (t) => (flipped ? { x: innerWidth - t.clientX, y: innerHeight - t.clientY } : { x: t.clientX, y: t.clientY });
+/** Where a touch is as the user sees it: turned with the Remote when it's upside down, so motion follows the thumb. */
+const point = (t) => unturn(t.clientX, t.clientY, { left: 0, top: 0, width: innerWidth, height: innerHeight }, turn);
 const touchesOf = (list) => Array.from(list, (t) => ({ id: t.identifier, ...point(t) }));
 
 /**
@@ -806,25 +806,29 @@ window.addEventListener('devicemotion', (e) => {
   if (!held || dragging() || !e.rotationRate) return;
   const dt = lastMotion === null ? 0 : Math.min((e.timeStamp - lastMotion) / 1000, 0.1);
   lastMotion = e.timeStamp;
-  // iOS keeps a portrait angle of 0 upside down; the Remote's own turn adds the other half.
-  const angle = (screen.orientation?.angle ?? window.orientation ?? 0) + (flipped ? 180 : 0);
+  // Upside down, iOS keeps the page as it was (portrait or landscape); the Remote's own turn makes it 180.
+  const angle = turn ? 180 : screenAngle();
   const { dx, dy } = airDelta(rotationVector(e.rotationRate), e.accelerationIncludingGravity ?? {}, angle, dt);
   if (dx || dy) sender.laser(dx, dy);
 });
 
 // ---------- Upside down ----------
 
+/** The screen's orientation angle: 0 portrait, 90 turned left (its top on the left), 270 turned right. */
+const screenAngle = () => ((((screen.orientation?.angle ?? window.orientation ?? 0) % 360) + 360) % 360);
+
 /**
  * Held upside down, mic toward the mouth, the Remote turns itself round: iPhones with Face ID never rotate
- * a page upside down. Only while the Phone Mic records from the iPhone's own mic, the one reason to hold it
+ * a page upside down, and a phone turned over through landscape stays in landscape, so the turn is a half
+ * or a quarter. Only while the Phone Mic records from the iPhone's own mic, the one reason to hold it
  * that way: with AirPods, or the mic off, a phone held loosely with its top down mustn't turn the buttons
- * round under the thumb. In Presentation Mode and portrait, from the tilt, once motion access is granted;
- * 'off' per device keeps it the right way up.
+ * round under the thumb. In Presentation Mode, from the tilt, once motion access is granted; 'off' per
+ * device keeps it the right way up.
  */
 let flipSetting = (() => { try { return localStorage.getItem('flip') === 'off' ? 'off' : 'auto'; } catch { return 'auto'; } })();
 const tilt = createFlip();
-const portrait = matchMedia('(orientation: portrait)');
-let flipped = false;
+/** How far the console is turned, clockwise in degrees: 0, 180, or 90 or -90 from landscape. */
+let turn = 0;
 
 function setFlip(value) {
   flipSetting = value;
@@ -834,15 +838,42 @@ function setFlip(value) {
 }
 
 function renderFlip() {
-  flipped = flipSetting === 'auto' && mic?.onPhone === true && app.dataset.mode === 'presentation'
-    && portrait.matches && tilt.flipped;
-  app.classList.toggle('flipped', flipped);
+  const flipped = flipSetting === 'auto' && mic?.onPhone === true && app.dataset.mode === 'presentation' && tilt.flipped;
+  const angle = screenAngle();
+  turn = flipped ? turnFor(angle) : 0;
+  if (turn) {
+    // Sized as the phone is held, so the console lays out for that shape: the CSS asks the frame, not the screen.
+    const sideways = turn !== 180;
+    frame.dataset.turn = turn;
+    frame.style.setProperty('--turn', `${turn}deg`);
+    frame.style.setProperty('--frame-w', `${sideways ? innerHeight : innerWidth}px`);
+    frame.style.setProperty('--frame-h', `${sideways ? innerWidth : innerHeight}px`);
+  } else {
+    delete frame.dataset.turn;
+    for (const name of ['--turn', '--frame-w', '--frame-h']) frame.style.removeProperty(name);
+  }
+  // In landscape the Dynamic Island is on the side the phone's top is.
+  frame.dataset.island = angle === 90 ? 'left' : 'right';
 }
 window.addEventListener('deviceorientation', (e) => {
   const before = tilt.flipped;
-  if (tilt.update(e.beta, e.timeStamp) !== before) renderFlip();
+  if (tilt.update(e.beta, e.gamma, e.timeStamp) !== before) renderFlip();
 });
-portrait.addEventListener('change', renderFlip);
+
+let lastAngle = screenAngle();
+function rotated() {
+  // iOS rotates the page only for a phone held that way up, so it isn't upside down any more.
+  if (screenAngle() !== lastAngle) {
+    lastAngle = screenAngle();
+    tilt.reset();
+  }
+  // iOS can leave the page scrolled after a rotation, though it never scrolls, and taps then land off
+  // what's drawn.
+  if (scrollX || scrollY) scrollTo(0, 0);
+  renderFlip();
+}
+window.addEventListener('resize', rotated);
+screen.orientation?.addEventListener('change', rotated);
 
 // ---------- Phone Mic ----------
 

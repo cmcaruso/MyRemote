@@ -43,37 +43,39 @@
     <symbol id="i-mic-off" viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
     <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
   </svg>
-  <main id="app" class="console">
-    <div class="padarea">
-      <div class="pad" id="pad">
-        <span class="conn" id="conn" title="Disconnected"></span>
-        <span class="mic-dot" id="mic-dot" hidden><svg class="icon"><use href="#i-mic"/></svg>MIC</span>
-        <button class="gear" id="gear" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></button>
-      </div>
-      <div class="strip" id="strip" aria-label="Scroll"><svg class="icon"><use href="#i-updown"/></svg></div>
-    </div>
-    <nav class="modes" id="modes">
-      <button data-mode="trackpad" aria-label="Trackpad"><svg class="icon"><use href="#i-touchpad"/></svg><span>Trackpad</span></button>
-      <button data-mode="keyboard" aria-label="Keys"><svg class="icon"><use href="#i-keyboard"/></svg><span>Keys</span></button>
-      <button data-mode="media" aria-label="Media"><svg class="icon"><use href="#i-music"/></svg><span>Media</span></button>
-      <button data-mode="presentation" aria-label="Present"><svg class="icon"><use href="#i-presentation"/></svg><span>Present</span></button>
-    </nav>
-    <section class="panel" id="panel"></section>
-    <dialog class="sheet" id="sheet">
-      <form method="dialog">
-        <div class="grabber"></div>
-        <header class="sheet-head">
-          <h2>Settings</h2>
-          <button class="done" value="done">Done</button>
-        </header>
-        <div class="sheet-body">
-          <div id="settings"></div>
-          <div class="group"><button type="button" class="row action" id="reset">Reset to Defaults</button></div>
-          <div class="group"><button type="button" class="row action danger" id="unpair">Unpair this Remote</button></div>
+  <div class="frame" id="frame">
+    <main id="app" class="console">
+      <div class="padarea">
+        <div class="pad" id="pad">
+          <span class="conn" id="conn" title="Disconnected"></span>
+          <span class="mic-dot" id="mic-dot" hidden><svg class="icon"><use href="#i-mic"/></svg>MIC</span>
+          <button class="gear" id="gear" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></button>
         </div>
-      </form>
-    </dialog>
-  </main>
+        <div class="strip" id="strip" aria-label="Scroll"><svg class="icon"><use href="#i-updown"/></svg></div>
+      </div>
+      <nav class="modes" id="modes">
+        <button data-mode="trackpad" aria-label="Trackpad"><svg class="icon"><use href="#i-touchpad"/></svg><span>Trackpad</span></button>
+        <button data-mode="keyboard" aria-label="Keys"><svg class="icon"><use href="#i-keyboard"/></svg><span>Keys</span></button>
+        <button data-mode="media" aria-label="Media"><svg class="icon"><use href="#i-music"/></svg><span>Media</span></button>
+        <button data-mode="presentation" aria-label="Present"><svg class="icon"><use href="#i-presentation"/></svg><span>Present</span></button>
+      </nav>
+      <section class="panel" id="panel"></section>
+      <dialog class="sheet" id="sheet">
+        <form method="dialog">
+          <div class="grabber"></div>
+          <header class="sheet-head">
+            <h2>Settings</h2>
+            <button class="done" value="done">Done</button>
+          </header>
+          <div class="sheet-body">
+            <div id="settings"></div>
+            <div class="group"><button type="button" class="row action" id="reset">Reset to Defaults</button></div>
+            <div class="group"><button type="button" class="row action danger" id="unpair">Unpair this Remote</button></div>
+          </div>
+        </form>
+      </dialog>
+    </main>
+  </div>
   <section class="pairing" id="pairing" hidden>
     <form id="pair-form">
       <div class="pair-glyph"><svg class="icon"><use href="#i-pointer"/></svg></div>
