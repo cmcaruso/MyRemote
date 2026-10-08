@@ -2,14 +2,30 @@
 :root {
   color-scheme: dark;
   --bg: #000;
-  --surface: #0e0e10;
-  --panel: #1c1c1f;
-  --panel-2: #2c2c31;
-  --line: #2a2a2f;
-  --text: #f2f2f7;
+  /* Surfaces, darkest to lightest: the pad, bars and controls, controls on a control, a pressed control. */
+  --surface-1: #0b0b0d;
+  --surface-2: #1c1c1e;
+  --surface-3: #2c2c2e;
+  --surface-4: #3a3a3c;
+  --panel-bg: #121214; /* the Mode panel, between the pad and its controls */
+  --hairline: rgb(255 255 255 / .08);
+  --highlight: inset 0 1px 0 rgb(255 255 255 / .06); /* light catching the top edge */
+  --raised: linear-gradient(rgb(255 255 255 / .035), rgb(255 255 255 / 0)) var(--surface-2);
+  --text: #f5f5f7;
   --muted: #8e8e93;
+  --accent: var(--accent);
+  --accent-line: rgb(10 132 255 / .45);
   --ok: #30d158;
   --bad: #ff453a;
+  --warn: #ffd60a;
+  --laser: #ff6b61;
+  --laser-bg: #1a0c0b;
+  --laser-line: #5a1f1c;
+  --laser-on: #3a1210;
+  --radius-s: 9px;
+  --radius-m: 14px;
+  --radius-l: 18px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
   --corner: 50px; /* follows the screen's rounded corners */
 }
 
@@ -30,7 +46,8 @@ html, body {
   font: 15px/1.3 -apple-system, system-ui, sans-serif;
   touch-action: manipulation;
 }
-button { font: inherit; color: inherit; border: 0; padding: 0; background: none; }
+button { font: inherit; color: inherit; border: 0; padding: 0; background: none; transition: transform .12s var(--ease), background-color .12s, color .12s; }
+output, .slider span { font-variant-numeric: tabular-nums; }
 
 /* Size to the real web view: `fixed; inset: 0`, never lvh (iOS 27 Home Screen apps can be shorter than lvh). */
 .console {
@@ -48,10 +65,13 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   position: relative;
   flex: 1;
   min-width: 0;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--corner) 18px 18px 18px;
+  overflow: hidden;
+  background: radial-gradient(140% 90% at 50% 0%, #131317, var(--surface-1) 70%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--corner) var(--radius-l) var(--radius-l) var(--radius-l);
+  box-shadow: var(--highlight);
   touch-action: none;
+  transition: border-color .2s;
 }
 .strip {
   width: 44px;
@@ -59,10 +79,12 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   display: grid;
   place-items: center;
   color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px var(--corner) 14px 14px;
+  background: linear-gradient(var(--surface-2), #161618);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-m) var(--corner) var(--radius-m) var(--radius-m);
+  box-shadow: var(--highlight);
   touch-action: none;
+  transition: background .15s, color .15s;
 }
 .conn { position: absolute; top: 14px; right: 14px; pointer-events: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 .conn.on { background: var(--ok); }
@@ -70,8 +92,8 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .mic-dot { position: absolute; top: 9px; right: 28px; pointer-events: none; padding: 1px 5px; border-radius: 6px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; }
 .mic-dot[hidden] { display: none; }
 
-.pad.drag { background: #151a24; border-color: #2c3a55; }
-.strip.on { background: var(--panel); color: var(--text); }
+.pad.drag { border-color: var(--accent-line); }
+.strip.on { background: var(--surface-3); color: var(--text); }
 .gear {
   position: absolute; left: 18px; bottom: 12px;
   width: 36px; height: 36px; border-radius: 50%;
@@ -82,9 +104,9 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   width: min(420px, calc(100vw - 32px));
   padding: 16px 18px 14px;
   color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-l);
 }
 .sheet::backdrop { background: rgb(0 0 0 / .55); }
 .sheet h2 { margin: 0 0 8px; font-size: 17px; }
@@ -92,14 +114,14 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .setting label { color: var(--muted); }
 .sheet h3 { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .sheet h3:first-child { margin-top: 4px; }
-.setting .seg { grid-column: span 2; display: flex; padding: 3px; background: var(--panel-2); border-radius: 9px; }
+.setting .seg { grid-column: span 2; display: flex; padding: 3px; background: var(--surface-3); border-radius: 9px; }
 .setting .seg button { flex: 1; height: 32px; border-radius: 7px; color: var(--muted); }
-.setting .seg button.on { background: #48484e; color: var(--text); }
+.setting .seg button.on { background: var(--surface-4); color: var(--text); }
 .setting output { text-align: right; font: 13px ui-monospace, Menlo, monospace; }
-.setting input[type=range] { width: 100%; accent-color: #0a84ff; }
+.setting input[type=range] { width: 100%; accent-color: var(--accent); }
 .sheet-buttons { display: flex; gap: 8px; margin-top: 12px; }
-.sheet-buttons button { flex: 1; height: 40px; border-radius: 10px; background: var(--panel-2); }
-.unpair { width: 100%; height: 40px; margin-top: 18px; border-radius: 10px; color: var(--bad); background: var(--panel-2); }
+.sheet-buttons button { flex: 1; height: 40px; border-radius: 10px; background: var(--surface-3); }
+.unpair { width: 100%; height: 40px; margin-top: 18px; border-radius: 10px; color: var(--bad); background: var(--surface-3); }
 
 /* Pairing: covers the console until the Host knows this Remote. */
 .pairing { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: var(--bg); }
@@ -107,19 +129,19 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .pairing form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 340px; text-align: center; }
 .pairing h1 { margin: 0; font-size: 24px; }
 .pairing p { margin: 0; color: var(--muted); line-height: 1.4; }
-.pairing .hint { color: #ffd60a; }
+.pairing .hint { color: var(--warn); }
 .pairing input {
-  height: 64px; border: 1px solid var(--line); border-radius: 14px;
-  color: var(--text); background: var(--surface);
+  height: 64px; border: 1px solid var(--hairline); border-radius: 14px;
+  color: var(--text); background: var(--surface-1);
   font: 600 32px ui-monospace, Menlo, monospace; letter-spacing: .15em; text-align: center;
 }
 .pairing .error { min-height: 1.4em; color: var(--bad); }
-.pairing button { height: 50px; border-radius: 14px; background: #0a84ff; font-weight: 600; }
+.pairing button { height: 50px; border-radius: 14px; background: var(--accent); font-weight: 600; }
 .pairing button:disabled { opacity: .5; }
 
-.modes { grid-area: modes; display: flex; padding: 3px; background: var(--panel); border-radius: 11px; }
+.modes { grid-area: modes; display: flex; padding: 3px; background: var(--raised); border: 1px solid var(--hairline); border-radius: 11px; box-shadow: var(--highlight); }
 .modes button { flex: 1; height: 36px; border-radius: 8px; font-size: 13px; color: var(--muted); }
-.modes button.on { background: var(--panel-2); color: var(--text); }
+.modes button.on { background: var(--surface-3); color: var(--text); }
 
 .panel {
   grid-area: panel;
@@ -129,25 +151,30 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   place-items: center;
   color: var(--muted);
   text-align: center;
-  background: #141416;
-  border-radius: 14px 14px var(--corner) var(--corner);
+  background: var(--panel-bg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-m) var(--radius-m) var(--corner) var(--corner);
+  box-shadow: var(--highlight);
 }
 .panel.filled { display: block; place-items: normal; padding: 12px 14px 22px; text-align: initial; color: var(--text); }
 
 /* Media Mode */
 .media { display: flex; flex-direction: column; gap: 14px; }
 .transport { display: flex; justify-content: center; align-items: center; gap: 18px; }
-.transport button { width: 64px; height: 64px; border-radius: 50%; background: var(--panel); font-size: 24px; }
+.transport button { width: 64px; height: 64px; border-radius: 50%; background: var(--raised); font-size: 24px; }
 .transport .play { width: 84px; height: 84px; background: var(--text); color: #000; font-size: 30px; }
 .volume { display: flex; align-items: center; gap: 6px; }
-.volume > button { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--panel); font-size: 22px; }
+.volume > button { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--raised); font-size: 22px; }
 .volume > button.on { background: var(--bad); }
-.slider { position: relative; flex: 1; height: 48px; overflow: hidden; background: var(--panel); border-radius: 12px; touch-action: none; }
-.slider .fill { position: absolute; inset: 0 auto 0 0; background: #0a84ff; }
-.slider.muted .fill { background: var(--panel-2); }
+.slider { position: relative; flex: 1; height: 48px; overflow: hidden; background: var(--raised); border-radius: 12px; touch-action: none; }
+.slider .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
+.slider.muted .fill { background: var(--surface-3); }
 .slider.fixed { opacity: .5; }
 .slider span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; }
-.transport button:active, .volume > button:active { background: var(--panel-2); }
+/* Raised controls catch the light on their top edge, and sink a little when pressed. */
+.transport button, .volume > button, .slider, .keyrow button, .present button, .aim-switch { box-shadow: var(--highlight); }
+.transport button:active, .volume > button:active { background: var(--surface-3); transform: scale(.95); }
+.keyrow button.down, .present .prev.down, .present .next.down { transform: scale(.96); }
 
 /* Keyboard Mode: the typed-text strip over a hidden field, two key rows, and the palette while the iOS keyboard is hidden. */
 .keys { display: flex; flex-direction: column; gap: 6px; }
@@ -159,14 +186,14 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   justify-content: flex-end; /* the newest text stays in view */
   overflow: hidden;
   padding: 0 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
   border-radius: 10px;
   font: 15px ui-monospace, Menlo, monospace;
   white-space: pre;
 }
 .typed .text:empty::before { content: "Tap to type"; color: var(--muted); font: 14px -apple-system, system-ui, sans-serif; }
-.console.typing .typed { border-color: #0a84ff; }
+.console.typing .typed { border-color: var(--accent); }
 .console.typing .typed .text:empty::before { content: none; }
 .console.typing .typed .text::after {
   content: "";
@@ -175,7 +202,7 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   height: 1.1em;
   margin-left: 1px;
   vertical-align: text-bottom;
-  background: #0a84ff;
+  background: var(--accent);
   animation: caret 1s steps(1) infinite;
 }
 @keyframes caret { 50% { opacity: 0; } }
@@ -195,13 +222,13 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   user-select: text;
 }
 .keyrow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-.keyrow button { height: 42px; border-radius: 9px; background: var(--panel); font-size: 17px; }
+.keyrow button { height: 42px; border-radius: 9px; background: var(--raised); font-size: 17px; }
 .keyrow [data-key="esc"], .keyrow [data-key="tab"] { font-size: 14px; }
-.keyrow button.down { background: var(--panel-2); }
-.keyrow button.once { background: #0a84ff; color: #fff; }
+.keyrow button.down { background: var(--surface-3); }
+.keyrow button.once { background: var(--accent); color: #fff; }
 .keyrow button.locked { background: var(--text); color: #000; }
 .keyrow .toggle { color: var(--muted); font-size: 22px; }
-.console.typing .keyrow .toggle { color: #0a84ff; }
+.console.typing .keyrow .toggle { color: var(--accent); }
 .palette { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .palette button { font-size: 13px; }
 .console.typing .palette { display: none; }
@@ -223,15 +250,15 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   grid-template-rows: 64px minmax(0, 1fr) minmax(0, 0.9fr);
   grid-template-areas: "prev black" "next next" "zone zone";
 }
-.present button { border-radius: 16px; background: var(--panel); font-size: 17px; font-weight: 600; }
+.present button { border-radius: 16px; background: var(--raised); font-size: 17px; font-weight: 600; }
 .present .prev { grid-area: prev; color: var(--muted); }
 .present .black { grid-area: black; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: var(--muted); }
 .present .black small { font-size: 11px; font-weight: 400; }
 .present .next { grid-area: next; font-size: 30px; background: var(--text); color: #000; }
-.present .prev.down { background: var(--panel-2); color: var(--text); }
+.present .prev.down { background: var(--surface-3); color: var(--text); }
 .present .next.down { background: #b8b8bd; }
 /* Black fills while held and goes solid when it fires. */
-.present .black::before { content: ""; position: absolute; inset: 0; background: var(--panel-2); transform: scaleX(0); transform-origin: left; }
+.present .black::before { content: ""; position: absolute; inset: 0; background: var(--surface-3); transform: scaleX(0); transform-origin: left; }
 .present .black.down::before { transform: scaleX(1); transition: transform .6s linear; }
 .present .black.fired { background: var(--text); color: #000; }
 .present .black.fired::before { display: none; }
@@ -239,37 +266,37 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 /* The aim area: a Laser | Pointer switch over the Laser zone or a trackpad for the real pointer. */
 .present .aim { grid-area: zone; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .aim-bar { display: flex; flex: none; gap: 6px; }
-.aim-switch { display: flex; flex: 1; padding: 3px; background: var(--panel); border-radius: 11px; }
+.aim-switch { display: flex; flex: 1; padding: 3px; background: var(--raised); border-radius: 11px; }
 .present .aim-gear { width: 36px; flex: none; border-radius: 11px; font-size: 17px; font-weight: 400; color: var(--muted); }
 .present .mic { flex: none; min-width: 64px; padding: 0 12px; border-radius: 11px; font-size: 13px; color: var(--muted); }
 .present .mic.starting { color: var(--text); }
 .present .mic.live { background: var(--bad); color: #fff; }
 .present .mic.denied { color: var(--bad); }
 .present .aim-switch button { flex: 1; height: 30px; border-radius: 8px; background: none; font-size: 13px; font-weight: 600; color: var(--muted); }
-.present .aim-switch button.on { background: var(--panel-2); color: var(--text); }
+.present .aim-switch button.on { background: var(--surface-3); color: var(--text); }
 .present[data-aim="laser"] .pointer-pad, .present[data-aim="pointer"] .zone { display: none; }
 .present .pointer-pad {
   flex: 1;
   min-height: 0;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
   border-radius: 16px;
   touch-action: none;
 }
-.present .pointer-pad.drag { background: #151a24; border-color: #2c3a55; }
+.present .pointer-pad.drag { border-color: var(--accent-line); }
 .present .zone {
   flex: 1;
   min-height: 0;
   display: grid;
   place-items: center;
-  border: 1px dashed #5a1f1c;
+  border: 1px dashed var(--laser-line);
   border-radius: 16px;
-  color: #ff6b61;
-  background: #1a0c0b;
+  color: var(--laser);
+  background: var(--laser-bg);
   font-weight: 600;
   touch-action: none;
 }
-.present .zone.on { background: #3a1210; border-style: solid; border-color: #ff453a; box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
+.present .zone.on { background: var(--laser-on); border-style: solid; border-color: var(--bad); box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
 
 /* Upside down (Present, portrait): the console turns round in place, being fixed to the whole screen.
    The settings sheet sits in the top layer, outside the console's transform, so it turns on its own. */
