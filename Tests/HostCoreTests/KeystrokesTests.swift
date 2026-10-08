@@ -148,3 +148,14 @@ struct AppSwitcherTests {
         #expect(switcher.releaseNow() == [])
     }
 }
+
+@Suite("Slide keys")
+struct SlideKeyTests {
+    @Test func pageDownAndUpComeFromTheFnLayerLikeAClicker() {
+        #expect(Keystrokes.press(Key.pageDown) == [
+            KeyEvent(code: 121, down: true, flags: .function),
+            KeyEvent(code: 121, down: false, flags: .function),
+        ])
+        #expect(Keystrokes.press(Key.pageUp)[0] == KeyEvent(code: 116, down: true, flags: .function))
+    }
+}

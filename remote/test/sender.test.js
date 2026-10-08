@@ -101,3 +101,14 @@ test('sends only the newest volume level while the socket is backed up', () => {
 
   assert.deepEqual(socket.frames, [{ t: 'v', v: 0.5 }]);
 });
+
+test('coalesces Laser motion like pointer motion, and sends it before the Laser is released', () => {
+  const socket = fakeSocket({ bufferedAmount: 120 });
+  const sender = createSender(socket);
+
+  sender.laser(3, -1);
+  sender.laser(2, 0.5);
+  sender.send({ t: 'le' });
+
+  assert.deepEqual(socket.frames, [{ t: 'l', dx: 5, dy: -0.5 }, { t: 'le' }]);
+});

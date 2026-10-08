@@ -1,4 +1,5 @@
 import { createKeyboard } from './keyboard.js';
+import { LASER, airDelta, rotationVector } from './laser.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -6,10 +7,7 @@ import { createVolumeSlider } from './volume-slider.js';
 // ---------- Modes ----------
 
 const MODES = ['trackpad', 'keyboard', 'media', 'presentation'];
-const PLACEHOLDER = {
-  presentation: 'Presentation Mode is coming.',
-};
-/** Mode panels that exist so far, by Mode; built further down. */
+/** Mode panels by Mode (Trackpad has none); built further down. */
 const PANELS = {};
 
 const app = document.getElementById('app');
@@ -33,11 +31,14 @@ function showMode(mode) {
     keyboard.reset();
     renderKeys();
   }
+  if (mode !== 'presentation' && lasing) endLaser();
   app.dataset.mode = mode;
   app.classList.toggle('full', mode === 'trackpad');
+  app.classList.toggle('presenting', mode === 'presentation');
   if (PANELS[mode]) panel.replaceChildren(PANELS[mode]);
-  else panel.textContent = PLACEHOLDER[mode] ?? '';
+  else panel.replaceChildren();
   panel.classList.toggle('filled', Boolean(PANELS[mode]));
+  keepAwake(mode === 'presentation');
   for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === mode);
   try { localStorage.setItem('mode', mode); } catch {}
 }
@@ -47,6 +48,8 @@ for (const b of modeButtons) {
     showMode(b.dataset.mode);
     // Keys raises the iOS keyboard straight away; focus has to happen inside the tap to do that.
     if (b.dataset.mode === 'keyboard') field.focus();
+    // Likewise iOS only asks for motion access from a tap.
+    if (b.dataset.mode === 'presentation') askMotion();
   });
 }
 
@@ -453,5 +456,121 @@ keys.addEventListener('touchcancel', lift, { passive: false });
 
 syncField();
 renderKeys();
+
+// ---------- Presentation Mode ----------
+
+const present = document.createElement('div');
+present.className = 'present';
+present.innerHTML = `
+  <button class="prev" data-slide="pgup" aria-label="Previous slide">‹ Prev</button>
+  <button class="black" aria-label="Black screen (hold)">Black<small>hold</small></button>
+  <button class="next" data-slide="pgdn" aria-label="Next slide">Next ›</button>
+  <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>`;
+PANELS.presentation = present;
+
+const zone = present.querySelector('.zone');
+const black = present.querySelector('.black');
+
+// Next and Prev act on touch-down, like a clicker.
+for (const b of present.querySelectorAll('[data-slide]')) {
+  b.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    b.classList.add('down');
+    sender.send({ t: 'kp', k: b.dataset.slide });
+  }, { passive: false });
+  for (const type of ['touchend', 'touchcancel']) b.addEventListener(type, () => b.classList.remove('down'));
+}
+
+// Black needs a long press, so it can't be hit by accident.
+const BLACK_MS = 600;
+let blackTimer = null;
+black.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  black.classList.add('down');
+  blackTimer = setTimeout(() => {
+    sender.send({ t: 'kp', c: 'b' });
+    black.classList.add('fired');
+  }, BLACK_MS);
+}, { passive: false });
+for (const type of ['touchend', 'touchcancel']) {
+  black.addEventListener(type, () => {
+    clearTimeout(blackTimer);
+    black.classList.remove('down', 'fired');
+  });
+}
+
+/** Motion access: 'unknown' until asked, then 'granted' or 'denied' (the Laser falls back to dragging). */
+let motion = typeof DeviceMotionEvent?.requestPermission === 'function' ? 'unknown' : 'granted';
+async function askMotion() {
+  if (motion !== 'unknown') return;
+  try {
+    motion = (await DeviceMotionEvent.requestPermission()) === 'granted' ? 'granted' : 'denied';
+  } catch {
+    // Not inside a tap: ask again on the next one.
+  }
+  zone.classList.toggle('drag', motion === 'denied');
+}
+
+let lasing = false;
+let lastMotion = null; // time of the last motion sample while held, ms
+let lastTouch = null; // finger position while dragging, when there's no motion access
+
+zone.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (lasing) return;
+  lasing = true;
+  lastMotion = null;
+  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  zone.classList.add('on');
+  sender.send({ t: 'ls' });
+}, { passive: false });
+
+zone.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!lasing || motion === 'granted') return;
+  const t = e.targetTouches[0];
+  sender.laser((t.clientX - lastTouch.x) * LASER.drag, (t.clientY - lastTouch.y) * LASER.drag);
+  lastTouch = { x: t.clientX, y: t.clientY };
+}, { passive: false });
+
+for (const type of ['touchend', 'touchcancel']) {
+  zone.addEventListener(type, (e) => {
+    e.preventDefault();
+    if (e.targetTouches.length > 0 || !lasing) return;
+    endLaser();
+    // Opened straight into Presentation Mode: the first release is the first tap iOS will ask from.
+    if (type === 'touchend') askMotion();
+  }, { passive: false });
+}
+
+function endLaser() {
+  lasing = false;
+  zone.classList.remove('on');
+  sender.send({ t: 'le' });
+}
+
+window.addEventListener('devicemotion', (e) => {
+  if (!lasing || !e.rotationRate) return;
+  const dt = lastMotion === null ? 0 : Math.min((e.timeStamp - lastMotion) / 1000, 0.1);
+  lastMotion = e.timeStamp;
+  const angle = screen.orientation?.angle ?? window.orientation ?? 0;
+  const { dx, dy } = airDelta(rotationVector(e.rotationRate), e.accelerationIncludingGravity ?? {}, angle, dt);
+  if (dx || dy) sender.laser(dx, dy);
+});
+
+// Keep the screen on while presenting. iOS drops the lock when the app goes to the background.
+let wakeLock = null;
+async function keepAwake(on) {
+  if (!on) {
+    wakeLock?.release().catch(() => {});
+    wakeLock = null;
+    return;
+  }
+  if (wakeLock && !wakeLock.released) return;
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake(app.dataset.mode === 'presentation');
+});
 
 showMode(storedMode());

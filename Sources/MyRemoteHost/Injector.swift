@@ -46,8 +46,8 @@ final class Injector {
         case let .mediaKey(key):
             postMediaKey(key, down: true)
             postMediaKey(key, down: false)
-        case .setVolume:
-            break // the Host sets volume through CoreAudio, not input events
+        case .setVolume, .laserStart, .laserMove, .laserEnd:
+            break // volume goes through CoreAudio and the Laser is an overlay, not input events
         case let .type(backspaces, text):
             for _ in 0..<backspaces { Keystrokes.press(Key.delete).forEach(post) }
             type(text)
