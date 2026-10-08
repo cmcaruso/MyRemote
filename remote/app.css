@@ -113,28 +113,67 @@ button .icon { pointer-events: none; }
 .gear .icon { width: 20px; height: 20px; }
 .gear:active { transform: scale(.92); color: var(--text); }
 
+/* Settings: an iOS bottom sheet that slides up, with inset grouped rows. */
 .sheet {
-  width: min(420px, calc(100vw - 32px));
-  padding: 16px 18px 14px;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-l);
+  margin: auto auto 0; width: 100%; max-width: 520px; max-height: 88dvh;
+  padding: 0; color: var(--text);
+  background: #111113;
+  border: 0; border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgb(0 0 0 / .5), var(--highlight);
+  transform: translateY(100%);
+  transition: transform .35s var(--ease), overlay .35s allow-discrete, display .35s allow-discrete;
 }
-.sheet::backdrop { background: rgb(0 0 0 / .55); }
-.sheet h2 { margin: 0 0 8px; font-size: 17px; }
-.setting { display: grid; grid-template-columns: 8em 1fr 3em; align-items: center; gap: 10px; min-height: 40px; }
-.setting label { color: var(--muted); }
-.sheet h3 { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.sheet h3:first-child { margin-top: 4px; }
-.setting .seg { grid-column: span 2; display: flex; padding: 3px; background: var(--surface-3); border-radius: 9px; }
-.setting .seg button { flex: 1; height: 32px; border-radius: 7px; color: var(--muted); }
-.setting .seg button.on { background: var(--surface-4); color: var(--text); }
-.setting output { text-align: right; font: 13px ui-monospace, Menlo, monospace; }
-.setting input[type=range] { width: 100%; accent-color: var(--accent); }
-.sheet-buttons { display: flex; gap: 8px; margin-top: 12px; }
-.sheet-buttons button { flex: 1; height: 40px; border-radius: 10px; background: var(--surface-3); }
-.unpair { width: 100%; height: 40px; margin-top: 18px; border-radius: 10px; color: var(--bad); background: var(--surface-3); }
+.sheet[open] { transform: none; }
+@starting-style { .sheet[open] { transform: translateY(100%); } }
+.sheet::backdrop { background: rgb(0 0 0 / 0); transition: background .35s, overlay .35s allow-discrete, display .35s allow-discrete; }
+.sheet[open]::backdrop { background: rgb(0 0 0 / .5); }
+@starting-style { .sheet[open]::backdrop { background: rgb(0 0 0 / 0); } }
+.sheet form { display: flex; flex-direction: column; max-height: 88dvh; }
+.sheet button:focus { outline: none; }
+.grabber { flex: none; width: 36px; height: 5px; margin: 6px auto 0; border-radius: 3px; background: var(--surface-4); }
+.sheet-head { position: relative; flex: none; display: grid; place-items: center; height: 44px; }
+.sheet-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sheet-head .done { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 17px; font-weight: 600; }
+.sheet-body { overflow: auto; overscroll-behavior: contain; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+.sheet h3 { margin: 18px 16px 6px; font-size: 13px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+.group { overflow: hidden; background: var(--surface-2); border-radius: 12px; box-shadow: var(--highlight); }
+.group + .group, .foot + .group { margin-top: 22px; }
+.foot { margin: 6px 16px 0; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.row {
+  position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 46px; padding: 8px 16px; text-align: left;
+}
+.row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline); }
+.slider-row { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 16px 10px; }
+.row-top { display: flex; justify-content: space-between; }
+.row output { color: var(--muted); }
+.action { justify-content: center; color: var(--accent); font-size: 16px; }
+.action.danger { color: var(--bad); }
+.action:active { background: var(--surface-3); }
+
+/* A range: a thin track filled with the accent up to a white thumb (--p, set from script). */
+.sheet input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; margin: 0; background: none; --p: 50%; }
+.sheet input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--p), var(--surface-4) var(--p)); }
+.sheet input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 28px; height: 28px; margin-top: -12px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / .35), 0 0 0 .5px rgb(0 0 0 / .1);
+}
+/* A switch: the iOS toggle on a plain checkbox. */
+input[role=switch] {
+  -webkit-appearance: none; appearance: none; position: relative; flex: none;
+  width: 51px; height: 31px; margin: 0; border-radius: 16px;
+  background: var(--surface-4); transition: background .2s;
+}
+input[role=switch]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgb(0 0 0 / .3);
+  transition: transform .25s var(--ease);
+}
+input[role=switch]:checked { background: var(--ok); }
+input[role=switch]:checked::after { transform: translateX(20px); }
+.seg { display: flex; flex: none; min-width: 150px; padding: 2px; background: var(--surface-3); border-radius: 9px; }
+.seg button { flex: 1; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+.seg button.on { background: #636366; box-shadow: 0 2px 6px rgb(0 0 0 / .3), var(--highlight); }
 
 /* Pairing: covers the console until the Host knows this Remote. */
 .pairing { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: var(--bg); }
@@ -331,7 +370,8 @@ button .icon { pointer-events: none; }
 @media (orientation: portrait) {
   .console { transition: transform .25s; }
   .console.flipped { transform: rotate(180deg); }
-  .console.flipped .sheet { rotate: 180deg; }
+  /* At the top of the screen, which is the bottom for someone holding it upside down. */
+  .console.flipped .sheet { margin: 0 auto auto; rotate: 180deg; }
 }
 
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */

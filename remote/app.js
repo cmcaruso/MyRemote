@@ -198,58 +198,66 @@ function saveParams() {
 const sheet = document.getElementById('sheet');
 const settings = document.getElementById('settings');
 
+/** Fills a range's track up to its thumb. */
+const fillRange = (input) => input.style.setProperty('--p', `${((input.value - input.min) / (input.max - input.min)) * 100}%`);
+
 function renderSettings() {
   settings.replaceChildren();
-  const heading = (text) => {
+  /** A titled group of rows, with a footnote under it. */
+  const section = (title, foot) => {
     const h = document.createElement('h3');
-    h.textContent = text;
-    settings.append(h);
+    h.textContent = title;
+    const group = document.createElement('div');
+    group.className = 'group';
+    const note = document.createElement('p');
+    note.className = 'foot';
+    note.textContent = foot;
+    settings.append(h, group, note);
+    return group;
   };
-  heading('Trackpad');
-  for (const [key, label, min, max, step] of SETTINGS) {
-    const row = document.createElement('div');
-    row.className = 'setting';
-    row.innerHTML = `<label for="set-${key}">${label}</label><input id="set-${key}" type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
-    const input = row.querySelector('input'), output = row.querySelector('output');
-    input.value = params[key];
-    output.textContent = params[key];
-    input.addEventListener('input', () => {
-      params[key] = Number(input.value);
-      output.textContent = input.value;
-      saveParams();
-    });
-    settings.append(row);
-  }
-  const row = document.createElement('div');
-  row.className = 'setting';
-  row.innerHTML = '<label for="set-momentum">Momentum</label><input id="set-momentum" type="checkbox">';
-  const box = row.querySelector('input');
-  box.checked = params.momentum;
-  box.addEventListener('change', () => { params.momentum = box.checked; saveParams(); });
-  settings.append(row);
-  const effect = document.createElement('div');
-  effect.className = 'setting';
-  effect.innerHTML = '<label for="set-effect">Pad effect</label><input id="set-effect" type="checkbox">';
-  const effectBox = effect.querySelector('input');
-  effectBox.checked = padEffect === 'on';
-  effectBox.addEventListener('change', () => setPadEffect(effectBox.checked ? 'on' : 'off'));
-  settings.append(effect);
-
-  heading('Present');
-  const segmented = (label, options, value, choose) => {
-    const row = document.createElement('div');
-    row.className = 'setting';
-    row.innerHTML = `<label>${label}</label><div class="seg">${options.map(([v, text]) =>
-      `<button type="button" data-value="${v}">${text}</button>`).join('')}</div>`;
-    for (const b of row.querySelectorAll('[data-value]')) {
+  const row = (group, className, html) => {
+    const el = document.createElement(className.includes('switch') ? 'label' : 'div');
+    el.className = className;
+    el.innerHTML = html;
+    group.append(el);
+    return el;
+  };
+  const toggle = (group, label, on, change) => {
+    const box = row(group, 'row switch', `<span>${label}</span><input type="checkbox" role="switch">`).querySelector('input');
+    box.checked = on;
+    box.addEventListener('change', () => change(box.checked));
+  };
+  const segmented = (group, label, options, value, choose) => {
+    const el = row(group, 'row', `<span>${label}</span><div class="seg">${options.map(([v, text]) =>
+      `<button type="button" data-value="${v}">${text}</button>`).join('')}</div>`);
+    for (const b of el.querySelectorAll('[data-value]')) {
       b.classList.toggle('on', b.dataset.value === value);
       b.addEventListener('click', () => { choose(b.dataset.value); renderSettings(); });
     }
-    settings.append(row);
   };
-  segmented('Laser', [['motion', 'Motion'], ['drag', 'Drag']], steer, setSteer);
-  segmented('Upside down', [['auto', 'Auto'], ['off', 'Off']], flipSetting, setFlip);
-  segmented('Echo guard', [['on', 'On'], ['off', 'Off']], guard, setGuard);
+
+  const trackpad = section('Trackpad', 'Momentum keeps the Mac scrolling after a two-finger flick. Pad effect is the dot grid on the trackpads.');
+  for (const [key, label, min, max, step] of SETTINGS) {
+    const el = row(trackpad, 'row slider-row', `<div class="row-top"><label for="set-${key}">${label}</label><output></output></div>
+      <input id="set-${key}" type="range" min="${min}" max="${max}" step="${step}">`);
+    const input = el.querySelector('input'), output = el.querySelector('output');
+    input.value = params[key];
+    output.textContent = params[key];
+    fillRange(input);
+    input.addEventListener('input', () => {
+      params[key] = Number(input.value);
+      output.textContent = input.value;
+      fillRange(input);
+      saveParams();
+    });
+  }
+  toggle(trackpad, 'Momentum', params.momentum, (on) => { params.momentum = on; saveParams(); });
+  toggle(trackpad, 'Pad effect', padEffect === 'on', (on) => setPadEffect(on ? 'on' : 'off'));
+
+  const presenting = section('Present', 'Upside down turns the Remote round when you hold the phone mic first while the Phone Mic is on. Echo guard keeps a room’s speakers from feeding back into the Phone Mic.');
+  segmented(presenting, 'Laser', [['motion', 'Motion'], ['drag', 'Drag']], steer, setSteer);
+  segmented(presenting, 'Upside down', [['auto', 'Auto'], ['off', 'Off']], flipSetting, setFlip);
+  segmented(presenting, 'Echo guard', [['on', 'On'], ['off', 'Off']], guard, setGuard);
 }
 
 function openSettings() {
