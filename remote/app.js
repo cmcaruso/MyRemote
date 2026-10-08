@@ -1,3 +1,4 @@
+import { DOTS, createDotGrid } from './dotgrid.js';
 import { createFlip } from './flip.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
@@ -69,7 +70,7 @@ const socketURL = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://
 function connect() {
   const socket = new WebSocket(socketURL('/ws'));
   sender = createSender(socket);
-  socket.addEventListener('open', () => conn.classList.add('on'));
+  socket.addEventListener('open', () => setConnected(true));
   socket.addEventListener('message', (e) => {
     let message;
     try { message = JSON.parse(e.data); } catch { return; }
@@ -79,12 +80,17 @@ function connect() {
     }
   });
   socket.addEventListener('close', (e) => {
-    conn.classList.remove('on');
+    setConnected(false);
     if (e.code === UNPAIRED) showPairing(e.reason);
     else if (pairing.hidden) setTimeout(connect, 1000);
   });
 }
 connect();
+
+function setConnected(on) {
+  conn.classList.toggle('on', on);
+  for (const layer of dotLayers) layer.render(); // the dots dim while the Host is away
+}
 
 // ---------- Pairing ----------
 
@@ -221,6 +227,13 @@ function renderSettings() {
   box.checked = params.momentum;
   box.addEventListener('change', () => { params.momentum = box.checked; saveParams(); });
   settings.append(row);
+  const effect = document.createElement('div');
+  effect.className = 'setting';
+  effect.innerHTML = '<label for="set-effect">Pad effect</label><input id="set-effect" type="checkbox">';
+  const effectBox = effect.querySelector('input');
+  effectBox.checked = padEffect === 'on';
+  effectBox.addEventListener('change', () => setPadEffect(effectBox.checked ? 'on' : 'off'));
+  settings.append(effect);
 
   heading('Present');
   const segmented = (label, options, value, choose) => {
@@ -249,9 +262,117 @@ document.getElementById('reset').addEventListener('click', () => {
   setSteer('motion');
   setFlip('auto');
   setGuard('on');
+  setPadEffect('on');
   saveParams();
   renderSettings();
 });
+
+// ---------- Dot grid ----------
+
+/** The Pad effect, per device: the trackpads' dot grid ('on'), or plain trackpads ('off'). */
+let padEffect = (() => { try { return localStorage.getItem('padEffect') === 'off' ? 'off' : 'on'; } catch { return 'on'; } })();
+function setPadEffect(value) {
+  padEffect = value;
+  try { localStorage.setItem('padEffect', value); } catch {}
+  for (const layer of dotLayers) layer.render();
+}
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const DOT_REST = [235, 235, 245];
+const DOT_LIT = [10, 132, 255]; // --accent
+/** Every surface with a dot grid. */
+const dotLayers = [];
+
+/**
+ * Draws the dot grid on a trackpad surface. Frames run only while the dots move, so an idle grid costs
+ * nothing. With Reduced Motion the grid stays still; while the Host is away it dims and stays white.
+ */
+function createDotLayer(el) {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'dots';
+  el.prepend(canvas);
+  const ctx = canvas.getContext('2d');
+  const grid = createDotGrid();
+  let width = 0, height = 0, running = false, last = 0;
+  let centre = null; // where the fingers were last, for a click's ring
+  const live = () => padEffect === 'on' && !reduceMotion.matches;
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+    if (padEffect !== 'on') return;
+    const online = conn.classList.contains('on');
+    const dim = online ? 1 : 0.35;
+    const lit = online ? DOT_LIT : DOT_REST;
+    const circle = (x, y, r) => { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 2 * Math.PI); };
+    // Dots at rest in one path, then the moving and lit ones one by one.
+    ctx.fillStyle = `rgba(${DOT_REST},${DOTS.idle * dim})`;
+    ctx.beginPath();
+    for (const d of grid.dots) if (!(d.glow || d.ox || d.oy)) circle(d.x, d.y, DOTS.size);
+    ctx.fill();
+    for (const d of grid.dots) {
+      if (!(d.glow || d.ox || d.oy)) continue;
+      const colour = DOT_REST.map((v, i) => Math.round(v + (lit[i] - v) * d.glow));
+      ctx.fillStyle = `rgba(${colour},${(DOTS.idle + (0.85 - DOTS.idle) * d.glow) * dim})`;
+      ctx.beginPath();
+      circle(d.x + d.ox, d.y + d.oy, DOTS.size * (1 + 0.6 * d.glow));
+      ctx.fill();
+    }
+  }
+
+  function frame(now) {
+    const busy = grid.step(now - last);
+    last = now;
+    draw();
+    if (busy && live()) requestAnimationFrame(frame);
+    else running = false;
+  }
+
+  /** Draws the grid again, and keeps drawing while it moves. */
+  function render() {
+    if (running) return;
+    if (!live()) {
+      grid.touches([]);
+      draw();
+      return;
+    }
+    running = true;
+    last = performance.now();
+    requestAnimationFrame(frame);
+  }
+
+  new ResizeObserver(() => {
+    width = el.clientWidth;
+    height = el.clientHeight;
+    const dpr = devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    grid.layout(width, height);
+    draw();
+  }).observe(el);
+
+  const layer = {
+    render,
+    /** Takes a touch event on the surface, and the commands it made: a click sends a ring out. */
+    feed(e, commands) {
+      if (!live()) return;
+      // In the surface's own pixels, which turn round with the console when it's upside down.
+      const box = el.getBoundingClientRect();
+      const fingers = Array.from(e.targetTouches, (t) => (flipped
+        ? { x: box.right - t.clientX, y: box.bottom - t.clientY }
+        : { x: t.clientX - box.left, y: t.clientY - box.top }));
+      if (fingers.length) {
+        centre = { x: fingers.reduce((sum, f) => sum + f.x, 0) / fingers.length, y: fingers.reduce((sum, f) => sum + f.y, 0) / fingers.length };
+      }
+      grid.touches(fingers);
+      if (centre && commands.some((c) => c.t === 'c')) grid.tap(centre.x, centre.y);
+      render();
+    },
+  };
+  dotLayers.push(layer);
+  return layer;
+}
+reduceMotion.addEventListener('change', () => { for (const layer of dotLayers) layer.render(); });
 
 // ---------- Trackpad and scroll strip ----------
 
@@ -269,14 +390,18 @@ rebuildGestures();
 const point = (t) => (flipped ? { x: innerWidth - t.clientX, y: innerHeight - t.clientY } : { x: t.clientX, y: t.clientY });
 const touchesOf = (list) => Array.from(list, (t) => ({ id: t.identifier, ...point(t) }));
 
-/** Feeds a surface's touches to its gesture recognizer; motion is sent straight from touchmove. */
-function listen(el, recognizer, onCommands = () => {}) {
+/**
+ * Feeds a surface's touches to its gesture recognizer; motion is sent straight from touchmove. Its dot
+ * grid, if it has one, hears about the touches only once their commands are sent.
+ */
+function listen(el, recognizer, onCommands = () => {}, dots = null) {
   const handle = (phase) => (e) => {
     if (e.target.closest('button')) return; // the gear is a normal button
     e.preventDefault();
     const commands = recognizer()[phase](touchesOf(e.targetTouches), e.timeStamp);
     onCommands(commands, e.targetTouches.length);
     dispatch(commands);
+    dots?.feed(e, commands);
   };
   el.addEventListener('touchstart', handle('start'), { passive: false });
   el.addEventListener('touchmove', handle('move'), { passive: false });
@@ -291,7 +416,7 @@ listen(pad, () => trackpad, (commands) => {
     if (c.t === 'd') pad.classList.add('drag');
     if (c.t === 'u') pad.classList.remove('drag');
   }
-});
+}, createDotLayer(pad));
 listen(strip, () => scrollStrip, (_, down) => strip.classList.toggle('on', down > 0));
 
 // ---------- Media Mode ----------
@@ -536,7 +661,7 @@ listen(pointerPad, () => trackpad, (commands) => {
     if (c.t === 'd') pointerPad.classList.add('drag');
     if (c.t === 'u') pointerPad.classList.remove('drag');
   }
-});
+}, createDotLayer(pointerPad));
 const black = present.querySelector('.black');
 
 // Next and Prev act on touch-down, like a clicker.
