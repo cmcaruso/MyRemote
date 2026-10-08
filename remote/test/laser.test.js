@@ -6,7 +6,7 @@ const near = (actual, expected) => {
   assert.ok(Math.abs(actual.dx - expected.dx) < 1e-9 && Math.abs(actual.dy - expected.dy) < 1e-9,
     `${JSON.stringify(actual)} ≠ ${JSON.stringify(expected)}`);
 };
-const p = { ...LASER, deadzone: 0 };
+const p = { ...LASER, deadzone: 0, steady: 0 };
 // Face up on a table, and upright facing the user; gravity signed either way.
 const FLAT = { x: 0, y: 0, z: -9.81 };
 const UPRIGHT = { x: 0, y: -9.81, z: 0 };
@@ -51,7 +51,14 @@ test('a hand held still doesn’t move the dot', () => {
 });
 
 test('the deadzone is taken off, so motion starts smoothly past it', () => {
-  near(airDelta([0, 0, -11.5], FLAT, 0, 1), { dx: 10 * LASER.gain, dy: 0 });
+  near(airDelta([0, 0, -11.5], FLAT, 0, 1, { ...LASER, steady: 0 }), { dx: 10 * LASER.gain, dy: 0 });
+});
+
+test('slow rotation, like turning while walking, is damped; deliberate pointing is not', () => {
+  const at = (rate) => airDelta([0, 0, -(rate + LASER.deadzone)], FLAT, 0, 1).dx / (rate * LASER.gain);
+  assert.ok(at(3) < 0.15, `3°/s keeps ${at(3)}`);
+  assert.ok(Math.abs(at(LASER.steady) - 0.5) < 1e-9);
+  assert.ok(at(40) > 0.95, `40°/s keeps ${at(40)}`);
 });
 
 test('scales with the time between samples', () => {

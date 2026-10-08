@@ -10,6 +10,7 @@
 export const LASER = Object.freeze({
   gain: 45, // points per degree turned
   deadzone: 1.5, // deg/s of rotation ignored, so a hand held still keeps the dot still
+  steady: 8, // deg/s: slower rotation is damped (half gain here), so walking and swaying don't drift the dot
   drag: 2.5, // points per touch pixel, when motion permission is refused
 });
 
@@ -22,6 +23,8 @@ export const rotationVector = (rate) => [rate.alpha ?? 0, rate.beta ?? 0, rate.g
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const dead = (r, zone) => (Math.abs(r) <= zone ? 0 : r - Math.sign(r) * zone);
+/** Fades out slow rotation: full gain for deliberate pointing, little for the slow turns of walking. */
+const steady = (r, k) => (k > 0 ? (r * r * r) / (r * r + k * k) : r);
 
 /**
  * @param {number[]} rotation deg/s about the device's x, y, z (see `rotationVector`)
@@ -44,7 +47,7 @@ export function airDelta(rotation, gravity, angle, dt, p = LASER) {
 
   // Right-hand rule: turning right is negative rotation about up; tilting the top up is positive
   // rotation about the screen's right. Screen y grows downward.
-  const yaw = dead(dot(rotation, up), p.deadzone);
-  const pitch = dead(dot(rotation, right), p.deadzone);
+  const yaw = steady(dead(dot(rotation, up), p.deadzone), p.steady);
+  const pitch = steady(dead(dot(rotation, right), p.deadzone), p.steady);
   return { dx: -yaw * p.gain * dt, dy: -pitch * p.gain * dt };
 }
