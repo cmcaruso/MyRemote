@@ -11,6 +11,10 @@ import Foundation
 /// - `{"t":"x"}`: a finger touched down; stops any momentum, like touching a real trackpad.
 /// - `{"t":"k","k":"play"}`: press a media key: `play`, `next`, `prev`, `volup`, `voldown`, `mute`.
 /// - `{"t":"v","v":0.4}`: set the output volume, 0 to 1 (clamped).
+/// - `{"t":"tx","bs":2,"s":"lo"}`: Keyboard Mode typing; press Backspace `bs` times, then type `s` as is.
+/// - `{"t":"kp","k":"left","m":["cmd"]}`: press a named `Key` with modifiers (`cmd`, `opt`, `ctrl`, `shift`; `m` optional).
+/// - `{"t":"kp","c":"z","m":["cmd"]}`: press the key that types character `c` in the Mac's layout, with modifiers.
+/// - `{"t":"as"}`: one tap of the App switcher (⌘ held for the Remote, Tab pressed).
 public enum Command: Equatable, Sendable {
     case move(dx: Double, dy: Double)
     case click(Button, count: Int)
@@ -21,6 +25,10 @@ public enum Command: Equatable, Sendable {
     case touchDown
     case mediaKey(MediaKey)
     case setVolume(Double)
+    case type(backspaces: Int, text: String)
+    case key(Key, KeyFlags)
+    case character(String, KeyFlags)
+    case appSwitcher
 
     public enum Button: Sendable {
         case left, right
@@ -60,6 +68,23 @@ extension Command {
         case "v":
             guard let v = frame.v else { return nil }
             self = .setVolume(min(max(v, 0), 1))
+        case "tx":
+            guard let bs = frame.bs, bs >= 0, let s = frame.s else { return nil }
+            self = .type(backspaces: bs, text: s)
+        case "kp":
+            guard let flags = KeyFlags(wire: frame.m ?? []) else { return nil }
+            switch (frame.k, frame.c) {
+            case let (k?, nil):
+                guard let key = Key(rawValue: k) else { return nil }
+                self = .key(key, flags)
+            case let (nil, c?):
+                guard c.count == 1 else { return nil }
+                self = .character(c, flags)
+            default:
+                return nil
+            }
+        case "as":
+            self = .appSwitcher
         default:
             return nil
         }
@@ -76,4 +101,8 @@ private struct Frame: Decodable {
     var vy: Double?
     var k: String?
     var v: Double?
+    var bs: Int?
+    var s: String?
+    var c: String?
+    var m: [String]?
 }

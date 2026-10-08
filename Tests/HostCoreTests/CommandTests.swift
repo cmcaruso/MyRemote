@@ -20,6 +20,14 @@ struct CommandTests {
         (#"{"t":"k","k":"voldown"}"#, .mediaKey(.volumeDown)),
         (#"{"t":"k","k":"mute"}"#, .mediaKey(.mute)),
         (#"{"t":"v","v":0.4}"#, .setVolume(0.4)),
+        (#"{"t":"tx","bs":2,"s":"lo"}"#, .type(backspaces: 2, text: "lo")),
+        (#"{"t":"tx","bs":0,"s":"é👍🏽"}"#, .type(backspaces: 0, text: "é👍🏽")),
+        (#"{"t":"kp","k":"left"}"#, .key(.left, [])),
+        (#"{"t":"kp","k":"up","m":["ctrl"]}"#, .key(.up, .control)),
+        (#"{"t":"kp","k":"del","m":["opt"]}"#, .key(.delete, .option)),
+        (#"{"t":"kp","c":"z","m":["cmd","shift"]}"#, .character("z", [.command, .shift])),
+        (#"{"t":"kp","c":" ","m":["cmd"]}"#, .character(" ", .command)),
+        (#"{"t":"as"}"#, .appSwitcher),
     ])
     func decodesEachCommand(_ text: String, _ expected: Command) {
         #expect(Command(decoding: text) == expected)
@@ -34,6 +42,13 @@ struct CommandTests {
         #"{"t":"m","dx":"1","dy":2}"#, // wrong field type
         #"{"t":"k","k":"eject"}"#,    // unknown media key
         #"{"t":"v"}"#,                // volume without a level
+        #"{"t":"tx","bs":-1,"s":""}"#, // negative backspaces
+        #"{"t":"tx","s":"a"}"#,       // typing without a backspace count
+        #"{"t":"kp","k":"f13"}"#,     // unknown key
+        #"{"t":"kp","c":"ab"}"#,      // more than one character
+        #"{"t":"kp","k":"tab","c":"a"}"#, // both a key and a character
+        #"{"t":"kp","m":["cmd"]}"#,   // neither
+        #"{"t":"kp","c":"a","m":["hyper"]}"#, // unknown modifier
     ])
     func ignoresFramesItDoesNotUnderstand(_ text: String) {
         #expect(Command(decoding: text) == nil)
