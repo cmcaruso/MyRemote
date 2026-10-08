@@ -134,6 +134,7 @@ async function pair() {
     if (response.ok) {
       pairing.hidden = true;
       pairCode.value = '';
+      renderCode();
       connect();
     } else {
       pairError.textContent = PAIR_ERRORS[body.error] ?? 'The Mac refused the code.';
@@ -148,7 +149,22 @@ async function pair() {
 
 pairForm.addEventListener('submit', (e) => { e.preventDefault(); pair(); });
 // Pair as soon as the sixth digit is in.
-pairCode.addEventListener('input', () => { if (pairCode.value.replace(/\D/g, '').length === 6) pair(); });
+pairCode.addEventListener('input', () => {
+  renderCode();
+  if (pairCode.value.replace(/\D/g, '').length === 6) pair();
+});
+pairCode.addEventListener('focus', renderCode);
+pairCode.addEventListener('blur', renderCode);
+
+/** Shows the typed digits in the cells, and where the next one goes. */
+function renderCode() {
+  const digits = pairCode.value.replace(/\D/g, '').slice(0, 6);
+  const focused = document.activeElement === pairCode;
+  pairForm.querySelectorAll('.cell').forEach((cell, i) => {
+    cell.textContent = digits[i] ?? '';
+    cell.classList.toggle('at', focused && i === Math.min(digits.length, 5));
+  });
+}
 
 document.getElementById('unpair').addEventListener('click', async () => {
   if (!confirm('Unpair this Remote? To use it again, you’ll need a new code from the Mac.')) return;
@@ -441,7 +457,7 @@ media.innerHTML = `
   <div class="volume">
     <button data-key="voldown" aria-label="Volume down">${icon('minus')}</button>
     <div class="slider" id="slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
-      <div class="fill"></div><span></span>
+      <div class="fill"></div>${icon('volume', 'lo')}<span></span>${icon('volume-2', 'hi')}
     </div>
     <button data-key="volup" aria-label="Volume up">${icon('plus')}</button>
     <button data-key="mute" class="mute" aria-label="Mute">${icon('volume-x')}</button>
@@ -454,7 +470,7 @@ for (const b of media.querySelectorAll('[data-key]')) {
 
 const slider = media.querySelector('#slider');
 const fill = slider.querySelector('.fill');
-const readout = slider.querySelector('span');
+const readout = slider.querySelector(':scope > span');
 
 function renderVolume() {
   const { level, muted, settable } = volumeSlider.state;
