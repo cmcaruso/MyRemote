@@ -73,6 +73,10 @@ How Pairing protects the Mac:
 
 With the Mic on, hold the phone upside down, mic toward your mouth, and the Remote turns round to match: iPhones with Face ID never rotate a page upside down, so it does it itself, only in Present, even when the phone went through landscape on the way over. It turns only while the Mic records from the iPhone itself: with AirPods or another headset, or the Mic off, the screen stays the right way up however you hold the phone. It reads the tilt, so it needs motion access, which iOS asks for when you turn on the Mic or use the Laser. To keep it the right way up, choose ⚙ → Present → Upside down: **Off**.
 
+### Gestures
+
+The Remote's trackpad follows the Mac's own trackpad settings for Gestures, so there's nothing to set up on the phone. ⚙ → **Gestures** lists them by the names System Settings → Trackpad uses, with the Mac's current choices: change them on the Mac and the list follows. Look up always shows as a three-finger tap when it's on, because a phone can't force-click. Tap to click, two-finger right-click and scroll direction stay the Remote's own.
+
 ### Phone Mic
 
 Tap **Mic** in Present to speak into the iPhone and have the Mac hear it, for example as your microphone in a Teams call. iOS asks for the microphone every time the Remote launches. While it's on, **Mic on** turns red, a **MIC** badge shows in the other Modes, and the phone stays awake. Tap it again to turn it off.
@@ -115,16 +119,18 @@ node --test 'remote/test/*.test.js'          # Remote logic
 swift run MyRemoteHost                       # run the Host unbundled, serving ./remote
 ```
 
+On macOS 26, Mission Control, App Exposé, Spaces, Show Desktop and Apps follow the fingers; on any other macOS they happen at once. To try that fallback on macOS 26, start the Host with `MYREMOTE_ONE_SHOT_GESTURES=1 swift run MyRemoteHost`, or quit the app and run `MYREMOTE_ONE_SHOT_GESTURES=1 build/MyRemote.app/Contents/MacOS/MyRemote`. ⚙ → Gestures then says they happen at once.
+
 When unbundled, the Host uses your terminal app's Accessibility grant, so rebuilding needs no new grant. Pairing has no bypass, so the Remote only works through `tailscale serve`: opening `http://127.0.0.1:8484` in a browser shows the pairing screen and refuses the code.
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording, the Phone Mic's jitter buffer). It's unit-tested and has no AppKit.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording, the Phone Mic's jitter buffer, reading the Mac trackpad settings). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket, the Phone Mic's `/mic` WebSocket and the `/pair` and `/unpair` requests. It posts input with `CGEvent` and plays the Phone Mic with `AVAudioEngine`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 
-`CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Pairing, Laser, Phone Mic).
+`CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Gesture, Mac trackpad settings, Pairing, Laser, Phone Mic).
 
 ## License
 

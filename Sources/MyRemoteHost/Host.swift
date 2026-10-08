@@ -26,9 +26,12 @@ final class Host {
     private let injector = Injector()
     private let volume = Volume()
     private let laser = LaserOverlay()
+    private let macTrackpad = MacTrackpad()
     private let clients = Clients()
     /// The last volume state pushed; CoreAudio reports one change several times.
     private var lastVolume: String?
+    /// The last Mac trackpad settings pushed; one change in System Settings signals several times.
+    private var lastTrackpad: String?
 
     init() {
         let configured = UserDefaults.standard.integer(forKey: "port")
@@ -55,6 +58,8 @@ final class Host {
 
         // Keep every Remote's volume slider in step with the Mac.
         volume.onChange = { [weak self] in self?.pushVolume() }
+        // And their Gestures in step with the Mac's trackpad settings.
+        macTrackpad.onChange = { [weak self] in self?.pushTrackpad() }
 
         let server = Server(
             remoteDirectory: Self.remoteDirectory(),
@@ -69,7 +74,10 @@ final class Host {
                     if delta < 0 {
                         self.injector.remoteLeft()
                         self.laser.end()
-                    } else { self.pushVolume(force: true) }
+                    } else {
+                        self.pushVolume(force: true)
+                        self.pushTrackpad(force: true)
+                    }
                     self.checkServe()
                 }
             },
@@ -135,6 +143,15 @@ final class Host {
         let text = volume.current().encoded()
         guard force || text != lastVolume else { return }
         lastVolume = text
+        let clients = clients
+        Task { await clients.broadcast(text) }
+    }
+
+    /// Sends the Mac trackpad settings to every Remote, like `pushVolume`.
+    private func pushTrackpad(force: Bool = false) {
+        let text = macTrackpad.current().encoded()
+        guard force || text != lastTrackpad else { return }
+        lastTrackpad = text
         let clients = clients
         Task { await clients.broadcast(text) }
     }
