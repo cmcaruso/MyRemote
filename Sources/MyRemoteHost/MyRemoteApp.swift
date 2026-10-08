@@ -60,6 +60,8 @@ struct HostMenu: View {
             Text("Can't save paired Remotes: \(error)")
         }
         Divider()
+        phoneMic
+        Divider()
         if host.accessibilityGranted {
             Text("Accessibility: granted")
         } else {
@@ -83,6 +85,28 @@ struct HostMenu: View {
         }
         Divider()
         Button("Quit MyRemote") { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+
+    @ViewBuilder private var phoneMic: some View {
+        let mic = host.mic
+        ForEach(MenuText.phoneMic(live: mic.live, output: mic.output?.name,
+                                  blackHoleInstalled: mic.blackHoleInstalled), id: \.text) { line in
+            Text(line.text)
+            if let copy = line.copy {
+                Button(copy.label) { host.copy(copy.text) }
+            }
+        }
+        if let error = mic.error {
+            Text("Phone Mic: \(error)")
+        }
+        if !mic.outputs.isEmpty {
+            Picker("Send Phone Mic To", selection: Binding(
+                get: { mic.output?.id ?? "" },
+                set: { mic.choose($0) })) {
+                ForEach(mic.outputs) { Text($0.name).tag($0.id) }
+            }
+            .pickerStyle(.menu)
+        }
     }
 
     @ViewBuilder private var pairedRemotes: some View {

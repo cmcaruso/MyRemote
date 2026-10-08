@@ -18,6 +18,8 @@ final class Host {
     private(set) var loginItem = LoginItem.status
     private(set) var loginItemError: String?
     let pairings = PairingStore()
+    /// Plays the Phone Mic into the output picked in the menu.
+    let mic = Microphone()
     /// The time the menu's "last used" is counted from, refreshed with the status checks.
     private(set) var now = Date.now
 
@@ -70,6 +72,10 @@ final class Host {
                     } else { self.pushVolume(force: true) }
                     self.checkServe()
                 }
+            },
+            mic: mic.feed,
+            onMic: { [weak self] stream, rate in
+                await MainActor.run { self?.mic.stream(stream, rate: rate) }
             }
         )
         Task {

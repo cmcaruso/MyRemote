@@ -10,6 +10,7 @@ Status: v1. All four Modes work, and a Remote has to be paired before it can con
 - An iPhone on iOS 18.4 or later.
 - [Tailscale](https://tailscale.com/download) on both, logged in to the same tailnet.
 - Node 24, only to run the Remote's tests.
+- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole), only to use the Phone Mic as a microphone in calls (see [Phone Mic](#phone-mic)).
 
 ## Build from source
 
@@ -68,13 +69,32 @@ How Pairing protects the Mac:
 
 ### 5. Presenting
 
-**Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. If you'd rather steer with your thumb, choose ⚙ → Laser → **Drag**. The zone then works like a trackpad, and the dot stays a moment after you lift so you can swipe again from where it is. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks for motion access the first time you lift your thumb off the zone, and again after every launch, because it doesn't remember the answer. Until you allow it, or if you refuse, drag your thumb in the zone instead. Drag never asks. Switch the zone from **Laser** to **Pointer** to get a trackpad for the real pointer, say to click a link or start a video. The phone stays awake while Present is showing.
+**Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. If you'd rather steer with your thumb, choose ⚙ → Present → Laser: **Drag**. The zone then works like a trackpad, and the dot stays a moment after you lift so you can swipe again from where it is. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks for motion access the first time you lift your thumb off the zone, and again after every launch, because it doesn't remember the answer. Until you allow it, or if you refuse, drag your thumb in the zone instead. Drag never asks. Switch the zone from **Laser** to **Pointer** to get a trackpad for the real pointer, say to click a link or start a video. The phone stays awake while Present is showing.
+
+Hold the phone upside down, mic toward your mouth, and the Remote turns round to match: iPhones with Face ID never rotate a page upside down, so it does it itself, in portrait and only in Present. It reads the tilt, so it needs motion access, which iOS asks for when you turn on the Mic or use the Laser. To keep it the right way up, choose ⚙ → Present → Upside down: **Off**.
+
+### Phone Mic
+
+Tap **Mic** in Present to speak into the iPhone and have the Mac hear it, for example as your microphone in a Teams call. iOS asks for the microphone every time the Remote launches. While it's on, **Mic on** turns red, a **MIC** badge shows in the other Modes, and the phone stays awake. Tap it again to turn it off.
+
+The Host plays your voice into an audio output that you pick in the menu under **Send Phone Mic To**. macOS doesn't let an app add a microphone by itself, so for calls you need BlackHole, a free virtual audio device. Install it once:
+
+```sh
+brew install --cask blackhole-2ch
+```
+
+It asks for your password. The Host picks **BlackHole 2ch** by default once it's installed. In Teams (or Zoom, Meet, …), choose **BlackHole 2ch** as the microphone. To play your voice out loud instead, for example through a room's speakers, pick that output in the menu. The menu says whether the Phone Mic is live and where it goes.
+
+- Expect about a tenth to a fifth of a second of delay, depending on the network.
+- iOS stops the mic when the Remote goes to the background or the phone locks. It starts again when you come back.
+- If people in the call hear themselves, the Mac's speakers are reaching the phone. Use headphones on the Mac.
 
 ## Known limitations
 
 - **Reconnecting.** The Remote reconnects a second after it loses the Host. If it seems stuck after the phone or the Mac slept, close the Home Screen app and open it again.
 - **Wi-Fi stutter.** With the Mac on Wi-Fi, the pointer can stall for about 100 ms a couple of times a second. The Mac's own Wi-Fi causes this, not the tailnet. A wired connection on the Mac avoids it.
 - **Networks that block Tailscale.** Some campus and office Wi-Fi blocks Tailscale, and the Remote can't reach the Mac. Put the iPhone on mobile data, or the Mac on a wired network, or both.
+- **Phone Mic in the background.** iOS doesn't let a web app use the microphone in the background, so keep the Remote open while you talk.
 - **Not included:** brightness control and a now-playing display. The Laser is tested over PowerPoint, Google Slides and Safari full screen, but not Keynote.
 
 ## Development
@@ -89,12 +109,12 @@ When unbundled, the Host uses your terminal app's Accessibility grant, so rebuil
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
-- `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket and the `/pair` and `/unpair` requests, and posts input with `CGEvent`.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording, the Phone Mic's jitter buffer). It's unit-tested and has no AppKit.
+- `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket, the Phone Mic's `/mic` WebSocket and the `/pair` and `/unpair` requests. It posts input with `CGEvent` and plays the Phone Mic with `AVAudioEngine`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 
-`CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Pairing, Laser).
+`CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Pairing, Laser, Phone Mic).
 
 ## License
 

@@ -66,6 +66,9 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 }
 .conn { position: absolute; top: 14px; right: 14px; pointer-events: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 .conn.on { background: var(--ok); }
+/* The Phone Mic is on, shown in every Mode. */
+.mic-dot { position: absolute; top: 9px; right: 28px; pointer-events: none; padding: 1px 5px; border-radius: 6px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; }
+.mic-dot[hidden] { display: none; }
 
 .pad.drag { background: #151a24; border-color: #2c3a55; }
 .strip.on { background: var(--panel); color: var(--text); }
@@ -238,6 +241,10 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .aim-bar { display: flex; flex: none; gap: 6px; }
 .aim-switch { display: flex; flex: 1; padding: 3px; background: var(--panel); border-radius: 11px; }
 .present .aim-gear { width: 36px; flex: none; border-radius: 11px; font-size: 17px; font-weight: 400; color: var(--muted); }
+.present .mic { flex: none; min-width: 64px; padding: 0 12px; border-radius: 11px; font-size: 13px; color: var(--muted); }
+.present .mic.starting { color: var(--text); }
+.present .mic.live { background: var(--bad); color: #fff; }
+.present .mic.denied { color: var(--bad); }
 .present .aim-switch button { flex: 1; height: 30px; border-radius: 8px; background: none; font-size: 13px; font-weight: 600; color: var(--muted); }
 .present .aim-switch button.on { background: var(--panel-2); color: var(--text); }
 .present[data-aim="laser"] .pointer-pad, .present[data-aim="pointer"] .zone { display: none; }
@@ -263,6 +270,14 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   touch-action: none;
 }
 .present .zone.on { background: #3a1210; border-style: solid; border-color: #ff453a; box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
+
+/* Upside down (Present, portrait): the console turns round in place, being fixed to the whole screen.
+   The settings sheet sits in the top layer, outside the console's transform, so it turns on its own. */
+@media (orientation: portrait) {
+  .console { transition: transform .25s; }
+  .console.flipped { transform: rotate(180deg); }
+  .console.flipped .sheet { rotate: 180deg; }
+}
 
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */
 .console.full .panel { display: none; }

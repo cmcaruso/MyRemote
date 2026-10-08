@@ -31,3 +31,7 @@ _Avoid_: device, session, client
 **Laser**:
 A glowing dot the Host draws on one display only while the user holds it in Presentation mode, steered by turning the phone; distinct from the real cursor, which it never moves.
 _Avoid_: pointer, cursor
+
+**Phone Mic**:
+The iPhone's microphone streamed to the Host, which plays it into an output picked in the menu: BlackHole 2ch, for a call to use as its microphone, or speakers.
+_Avoid_: microphone (alone), audio, voice

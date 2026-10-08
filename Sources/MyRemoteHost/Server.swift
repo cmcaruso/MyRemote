@@ -14,11 +14,14 @@ enum Outgoing: Sendable {
 
 /// The connected Remotes' outgoing queues, so the Host can push state (like the volume) to all of them.
 actor Clients {
-    private var outboxes: [UUID: (remote: Pairing.Remote.ID, outbox: AsyncStream<Outgoing>.Continuation)] = [:]
+    /// `/ws` carries commands and gets the Host's broadcasts; `/mic` only streams the Phone Mic.
+    enum Kind { case control, mic }
 
-    func add(_ outbox: AsyncStream<Outgoing>.Continuation, remote: Pairing.Remote.ID) -> UUID {
+    private var outboxes: [UUID: (remote: Pairing.Remote.ID, kind: Kind, outbox: AsyncStream<Outgoing>.Continuation)] = [:]
+
+    func add(_ outbox: AsyncStream<Outgoing>.Continuation, remote: Pairing.Remote.ID, kind: Kind = .control) -> UUID {
         let id = UUID()
-        outboxes[id] = (remote, outbox)
+        outboxes[id] = (remote, kind, outbox)
         return id
     }
 
@@ -27,12 +30,12 @@ actor Clients {
     }
 
     func broadcast(_ text: String) {
-        for (_, outbox) in outboxes.values { outbox.yield(.text(text)) }
+        for (_, kind, outbox) in outboxes.values where kind == .control { outbox.yield(.text(text)) }
     }
 
     /// Drops every connection of a revoked Remote, or of all Remotes when `remote` is nil.
     func unpair(_ remote: Pairing.Remote.ID?) {
-        for (owner, outbox) in outboxes.values where remote == nil || owner == remote {
+        for (owner, _, outbox) in outboxes.values where remote == nil || owner == remote {
             outbox.yield(.unpaired)
         }
     }
@@ -47,6 +50,10 @@ struct Server: Sendable {
     let pairings: PairingStore
     /// Called with +1 when a Remote connects (after it can receive broadcasts) and -1 when it leaves.
     let onRemote: @Sendable (Int) async -> Void
+    /// Where the Phone Mic's samples go, straight from the network.
+    let mic: MicFeed
+    /// Called with a Phone Mic stream and its sample rate when it starts, and nil when it ends.
+    let onMic: @Sendable (UUID, Double?) async -> Void
 
     /// The app's close code for a Remote that isn't (or is no longer) paired; the Remote shows Pairing.
     static let unpairedCloseCode: WebSocketErrorCode = .unknown(4401)
@@ -56,6 +63,8 @@ struct Server: Sendable {
         let clients = clients
         let pairings = pairings
         let onRemote = onRemote
+        let mic = mic
+        let onMic = onMic
 
         let router = Router()
         router.add(middleware: FileMiddleware(remoteDirectory, searchForIndexHtml: true))
@@ -81,19 +90,9 @@ struct Server: Sendable {
 
         let wsRouter = Router(context: BasicWebSocketRequestContext.self)
         wsRouter.ws("/ws") { request, _ in
-            // A browser can't read a refused handshake's status, so every Remote is let in and the unpaired
-            // ones are closed with 4401 below. A paired Remote's cookie is sent again so it never expires.
-            guard case let .paired(_, cookie) = await pairings.check(Self.facts(request)) else { return .upgrade([:]) }
-            return .upgrade([.setCookie: cookie])
+            await Self.shouldUpgrade(request, pairings)
         } onUpgrade: { inbound, outbound, context in
-            let remote: Pairing.Remote
-            switch await pairings.check(Self.facts(context.request)) {
-            case let .paired(paired, _):
-                remote = paired
-            case let .refused(refusal):
-                try await outbound.close(Self.unpairedCloseCode, reason: "\(refusal)")
-                return
-            }
+            guard let remote = try await Self.pairedRemote(context.request, pairings, outbound) else { return }
             let (outbox, continuation) = AsyncStream.makeStream(of: Outgoing.self)
             let id = await clients.add(continuation, remote: remote.id)
             await onRemote(1)
@@ -119,6 +118,42 @@ struct Server: Sendable {
             }
         }
 
+        // The Phone Mic: binary frames of 16-bit mono PCM at `?rate=`, on a socket of its own so audio
+        // never holds up commands.
+        wsRouter.ws("/mic") { request, _ in
+            await Self.shouldUpgrade(request, pairings)
+        } onUpgrade: { inbound, outbound, context in
+            guard let remote = try await Self.pairedRemote(context.request, pairings, outbound) else { return }
+            guard let rate = MicStream.rate(query: context.request.uri.query) else {
+                try await outbound.close(.unacceptableData, reason: "rate")
+                return
+            }
+            let (outbox, continuation) = AsyncStream.makeStream(of: Outgoing.self)
+            let id = await clients.add(continuation, remote: remote.id, kind: .mic)
+            mic.begin(id, rate: rate)
+            await onMic(id, rate)
+            defer {
+                Task {
+                    await clients.remove(id)
+                    if mic.end(id) { await onMic(id, nil) }
+                }
+            }
+
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await case .unpaired in outbox {
+                        try await outbound.close(Self.unpairedCloseCode, reason: "notPaired")
+                        return
+                    }
+                }
+                for try await message in inbound.messages(maxSize: 1 << 16) {
+                    guard case let .binary(buffer) = message else { continue }
+                    mic.write(id, MicStream.samples(buffer.readableBytesView))
+                }
+                group.cancelAll()
+            }
+        }
+
         let app = Application(
             router: router,
             server: .http1WebSocketUpgrade(webSocketRouter: wsRouter),
@@ -126,6 +161,25 @@ struct Server: Sendable {
         )
         // The app owns its lifecycle: leave SIGTERM/SIGINT to quit the process, not just stop the server.
         try await app.runService(gracefulShutdownSignals: [])
+    }
+
+    /// A browser can't read a refused handshake's status, so every Remote is let in and the unpaired
+    /// ones are closed with 4401 by `pairedRemote`. A paired Remote's cookie is sent again so it never expires.
+    private static func shouldUpgrade(_ request: Request, _ pairings: PairingStore) async -> RouterShouldUpgrade {
+        guard case let .paired(_, cookie) = await pairings.check(facts(request)) else { return .upgrade([:]) }
+        return .upgrade([.setCookie: cookie])
+    }
+
+    /// The paired Remote on an upgraded socket, or nil after closing the socket with 4401.
+    private static func pairedRemote(_ request: Request, _ pairings: PairingStore,
+                                     _ outbound: WebSocketOutboundWriter) async throws -> Pairing.Remote? {
+        switch await pairings.check(facts(request)) {
+        case let .paired(remote, _):
+            return remote
+        case let .refused(refusal):
+            try await outbound.close(unpairedCloseCode, reason: "\(refusal)")
+            return nil
+        }
     }
 
     private struct PairBody: Decodable {
