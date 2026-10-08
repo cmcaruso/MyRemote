@@ -1,0 +1,427 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway: answers "How should multi-finger gestures feel on the phone pad?" (issue #45).
+  Phone-side only: it recognizes gestures and shows what it would send; nothing reaches the Mac.
+  Serve remote/ and open /prototype-gestures/ on the iPhone.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Gestures prototype</title>
+  <style>
+    :root { --bg: #000; --pad: #0b0b0d; --line: #2a2a2e; --text: #f2f2f7; --dim: #8e8e93; --accent: #0a84ff; --warn: #ff453a; }
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px -apple-system, system-ui, sans-serif; overflow: hidden; }
+    body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 10px env(safe-area-inset-bottom); gap: 8px; touch-action: none; }
+    header { padding-top: 8px; }
+    #kind { font-size: 26px; font-weight: 600; min-height: 32px; }
+    #vals { color: var(--dim); font-variant-numeric: tabular-nums; min-height: 18px; }
+    #mac { color: var(--dim); font-size: 11px; margin-top: 2px; }
+    #pad { position: relative; flex: 1; min-height: 200px; background: var(--pad); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; touch-action: none; }
+    #pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #toast { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; pointer-events: none; opacity: 0; transition: opacity .5s; }
+    #toast.on { opacity: 1; transition: none; }
+    #edge { position: absolute; top: 0; bottom: 0; right: 0; width: 30px; border-left: 1px dashed #333; pointer-events: none; }
+    #log { height: 128px; overflow: hidden; font: 11px ui-monospace, Menlo, monospace; color: var(--dim); white-space: pre; }
+    #log .warn { color: var(--warn); }
+    #log .ok { color: var(--text); }
+    .bar { display: flex; gap: 8px; }
+    button { font: inherit; color: var(--text); background: #1c1c1e; border: 0; border-radius: 10px; padding: 10px 12px; }
+    #panel { position: fixed; inset: 0; background: rgba(0,0,0,.92); overflow-y: auto; padding: calc(env(safe-area-inset-top) + 12px) 16px 40px; display: none; touch-action: pan-y; }
+    #panel.on { display: block; }
+    #panel label { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #222; }
+    #panel h3 { margin: 18px 0 4px; color: var(--dim); font-size: 12px; text-transform: uppercase; }
+    select, input[type=range] { max-width: 55%; }
+    #keys { position: fixed; left: -9999px; top: 0; width: 10px; height: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="kind">Touch the pad</div>
+    <div id="vals"></div>
+    <div id="mac"></div>
+  </header>
+  <div id="pad"><canvas></canvas><div id="edge"></div><div id="toast"></div></div>
+  <div id="log"></div>
+  <div class="bar"><button id="open">Settings</button><button id="clear">Clear log</button><button id="kbtn">Keys focus: off</button></div>
+  <textarea id="keys" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+  <div id="panel"></div>
+
+<script type="module">
+import { createDotGrid, DOTS } from '../dotgrid.js';
+
+// ---------- Settings: the Mac's trackpad prefs it would follow, plus the knobs being tuned ----------
+
+const cfg = {
+  swipeFingers: '3', // Mission Control, App Exposé and Spaces: 3 or 4 fingers (Mac pref)
+  pageSwipe: '2', // swipe between pages: '2' scroll left/right, '3' three-finger swipe, 'off' (Mac pref)
+  threeDrag: 'off', // three-finger drag (Mac pref)
+  lookUp: 'on', // three-finger tap (Mac pref)
+  smartZoom: 'on', // two-finger double-tap (Mac pref)
+  rightClick: 'immediate', // two-finger tap: 'immediate', or 'wait' out the smart-zoom window
+  notifEdge: 'on', // two fingers from the right edge (Mac pref)
+  appsPinch: 'on', // 4+ finger pinch in = Apps, spread = Show Desktop (Mac pref)
+  settleMs: 60, // wait for the finger count to stop changing before deciding
+  slop: 8, // px a finger can wander and still be a tap
+  commitPx: 30, // px the fingers travel before a swipe is decided
+  pinchPct: 15, // % change in finger spread that makes a pinch
+  rotateDeg: 15, // degrees of turn that make a rotate
+  bigPinchPct: 20, // % change in spread for the 4+ finger pinch
+  completeAt: 25, // % of half the pad width a swipe must travel to complete on release
+  tapMs: 250,
+  dblMs: 300,
+  feedback: 'tint+label', // dot grid feedback: 'plain' | 'tint' | 'tint+label'
+  blockEdits: 'off', // cancel undo / redo / paste input while Keys focus is on
+};
+
+const schema = [
+  ['Mac settings (what the Host would mirror)'],
+  ['swipeFingers', 'Mission Control / Spaces fingers', ['3', '4']],
+  ['pageSwipe', 'Swipe between pages', ['2', '3', 'off']],
+  ['threeDrag', 'Three-finger drag', ['off', 'on']],
+  ['lookUp', 'Look up (3-finger tap)', ['on', 'off']],
+  ['smartZoom', 'Smart zoom (2-finger double-tap)', ['on', 'off']],
+  ['notifEdge', 'Notification Center (2 fingers from right edge)', ['on', 'off']],
+  ['appsPinch', 'Apps / Show Desktop (4+ finger pinch)', ['on', 'off']],
+  ['Feel'],
+  ['rightClick', 'Right-click with smart zoom on', ['immediate', 'wait']],
+  ['settleMs', 'Settle (ms)', [0, 200, 10]],
+  ['slop', 'Tap slop (px)', [4, 20, 1]],
+  ['commitPx', 'Swipe commit (px)', [10, 80, 5]],
+  ['pinchPct', 'Pinch commit (%)', [5, 40, 1]],
+  ['rotateDeg', 'Rotate commit (°)', [5, 40, 1]],
+  ['bigPinchPct', '4+ finger pinch commit (%)', [10, 50, 1]],
+  ['completeAt', 'Swipe completes at (%)', [10, 60, 5]],
+  ['tapMs', 'Longest tap (ms)', [120, 400, 10]],
+  ['dblMs', 'Double-tap window (ms)', [150, 500, 10]],
+  ['Feedback and hazards'],
+  ['feedback', 'Dot grid feedback', ['plain', 'tint', 'tint+label']],
+  ['blockEdits', 'Cancel undo/paste input in Keys focus', ['off', 'on']],
+];
+
+const panel = document.getElementById('panel');
+function buildPanel() {
+  panel.innerHTML = '<button id="close">Done</button>';
+  for (const [key, label, opts] of schema) {
+    if (!label) { panel.insertAdjacentHTML('beforeend', `<h3>${key}</h3>`); continue; }
+    const row = document.createElement('label');
+    row.textContent = label;
+    let input;
+    if (typeof opts[0] === 'number') {
+      input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: opts[0], max: opts[1], step: opts[2], value: cfg[key] });
+      const out = document.createElement('span');
+      out.textContent = cfg[key];
+      input.oninput = () => { cfg[key] = +input.value; out.textContent = input.value; showMac(); };
+      row.append(out);
+    } else {
+      input = document.createElement('select');
+      for (const o of opts) input.add(new Option(o, o, false, cfg[key] === o));
+      input.onchange = () => { cfg[key] = input.value; showMac(); };
+    }
+    row.append(input);
+    panel.append(row);
+  }
+  panel.querySelector('#close').onclick = () => panel.classList.remove('on');
+}
+buildPanel();
+document.getElementById('open').onclick = () => panel.classList.add('on');
+
+const macEl = document.getElementById('mac');
+function showMac() {
+  macEl.textContent = `Mac: swipes ${cfg.swipeFingers}F · pages ${cfg.pageSwipe === 'off' ? 'off' : cfg.pageSwipe + 'F'} · 3F drag ${cfg.threeDrag} · look up ${cfg.lookUp} · smart zoom ${cfg.smartZoom} · right-click ${cfg.rightClick}`;
+}
+showMac();
+
+// ---------- Readout and log ----------
+
+const kindEl = document.getElementById('kind');
+const valsEl = document.getElementById('vals');
+const logEl = document.getElementById('log');
+const toast = document.getElementById('toast');
+let lines = [];
+function log(text, cls = '') {
+  const t = (performance.now() / 1000).toFixed(2).padStart(7);
+  lines.unshift(`<span class="${cls}">${t}  ${text}</span>`);
+  lines = lines.slice(0, 9);
+  logEl.innerHTML = lines.join('\n');
+}
+document.getElementById('clear').onclick = () => { lines = []; logEl.innerHTML = ''; };
+
+let toastTimer;
+function announce(label, cls) {
+  kindEl.textContent = label;
+  log(label, 'ok');
+  if (cfg.feedback !== 'tint+label') return;
+  toast.textContent = label;
+  toast.style.color = `rgb(${colourOf(cls)})`;
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('on'), 500);
+}
+
+// ---------- Keys focus: the Keyboard Mode textarea hazard ----------
+
+const keys = document.getElementById('keys');
+const kbtn = document.getElementById('kbtn');
+let keysOn = false;
+kbtn.onclick = () => {
+  keysOn = !keysOn;
+  kbtn.textContent = `Keys focus: ${keysOn ? 'on' : 'off'}`;
+  if (keysOn) keys.focus(); else keys.blur();
+};
+keys.addEventListener('blur', () => { if (keysOn) log('Keys textarea lost focus', 'warn'); });
+keys.addEventListener('beforeinput', (e) => {
+  const edit = /^history|FromPaste|deleteByCut/.test(e.inputType);
+  if (edit && cfg.blockEdits === 'on') e.preventDefault();
+  log(`beforeinput ${e.inputType}${edit ? (cfg.blockEdits === 'on' ? ' (cancelled)' : ' ← WOULD REACH THE MAC') : ''}`, edit ? 'warn' : '');
+});
+
+// ---------- Geometry ----------
+
+const pad = document.getElementById('pad');
+const centroid = (l) => ({ x: l.reduce((s, f) => s + f.x, 0) / l.length, y: l.reduce((s, f) => s + f.y, 0) / l.length });
+const spreadOf = (l, c) => l.reduce((s, f) => s + Math.hypot(f.x - c.x, f.y - c.y), 0) / l.length;
+const angleOf = (l) => (l.length >= 2 ? Math.atan2(l[1].y - l[0].y, l[1].x - l[0].x) : 0);
+const deg = (r) => (r * 180) / Math.PI;
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+function snapshot(list) {
+  const sorted = [...list].sort((a, b) => a.id - b.id);
+  const c = centroid(sorted);
+  return { ids: sorted.map((f) => f.id).join(), c, spread: spreadOf(sorted, c), angle: angleOf(sorted), n: sorted.length };
+}
+
+// ---------- Recognizer ----------
+
+/** kind → class, for colour */
+const CLASS = {
+  pointer: 'pointer', click: 'pointer', 'right click': 'pointer', 'three-finger drag': 'pointer', 'look up': 'pointer',
+  scroll: 'scroll', 'page swipe': 'scroll',
+  pinch: 'app', rotate: 'app', 'smart zoom': 'app',
+  'Mission Control': 'system', 'App Exposé': 'system', Spaces: 'system', 'Notification Center': 'system',
+  Apps: 'system', 'Show Desktop': 'system',
+};
+const COLOURS = { pointer: [10, 132, 255], scroll: [100, 210, 255], app: [191, 90, 242], system: [48, 209, 88], none: [142, 142, 147] };
+const colourOf = (cls) => COLOURS[cls] || COLOURS.none;
+
+let s = null; // session: one touch sequence, first finger down to last finger up
+let lastTwoTap = 0;
+let pendingRight = null;
+
+function begin(list, t) {
+  s = { t0: t, peak: list.length, kind: null, base: snapshot(list), settleAt: t + cfg.settleMs, starts: new Map(), wander: 0, total: { x: 0, y: 0 }, last: null, edgeStart: false, samples: [] };
+  for (const f of list) s.starts.set(f.id, f);
+}
+
+function classify(list, t) {
+  const now = snapshot(list), b = s.base, n = now.n;
+  const d = { x: now.c.x - b.c.x, y: now.c.y - b.c.y }, dist = Math.hypot(d.x, d.y);
+  const spreadPx = now.spread - b.spread;
+  const turn = deg(wrap(now.angle - b.angle));
+  const horiz = Math.abs(d.x) > Math.abs(d.y);
+  const W = pad.clientWidth;
+
+  const swipe = (fingers) => {
+    if (dist < cfg.commitPx) return null;
+    if (horiz) {
+      if (cfg.pageSwipe === String(fingers)) return 'page swipe';
+      if (cfg.swipeFingers === String(fingers)) return 'Spaces';
+      return `${fingers}-finger swipe (unassigned)`;
+    }
+    if (cfg.swipeFingers !== String(fingers)) return `${fingers}-finger swipe (unassigned)`;
+    return d.y < 0 ? 'Mission Control' : 'App Exposé';
+  };
+
+  if (n === 1) return dist > cfg.slop ? 'pointer' : null;
+  if (n === 2) {
+    if (cfg.notifEdge === 'on' && b.c.x > W - 30 && d.x < -cfg.commitPx && horiz) return 'Notification Center';
+    if (Math.abs(spreadPx) > (cfg.pinchPct / 100) * b.spread && Math.abs(spreadPx) > dist * 0.8) return 'pinch';
+    if (Math.abs(turn) > cfg.rotateDeg && dist < 25) return 'rotate';
+    if (dist > cfg.slop) return 'scroll';
+    return null;
+  }
+  if (n === 3) {
+    if (cfg.threeDrag === 'on') return dist > cfg.slop ? 'three-finger drag' : null;
+    return swipe(3);
+  }
+  // 4 or 5 fingers
+  const ratio = now.spread / b.spread;
+  if (cfg.appsPinch === 'on' && ratio < 1 - cfg.bigPinchPct / 100) return 'Apps';
+  if (cfg.appsPinch === 'on' && ratio > 1 + cfg.bigPinchPct / 100) return 'Show Desktop';
+  return swipe(4);
+}
+
+function values(list) {
+  const now = snapshot(list), b = s.base;
+  const d = { x: now.c.x - b.c.x, y: now.c.y - b.c.y };
+  const W = pad.clientWidth, H = pad.clientHeight;
+  switch (s.kind) {
+    case 'pinch': return `scale ${(now.spread / b.spread).toFixed(2)}  rotation ${deg(wrap(now.angle - b.angle)).toFixed(0)}°`;
+    case 'rotate': return `rotation ${deg(wrap(now.angle - b.angle)).toFixed(0)}°  scale ${(now.spread / b.spread).toFixed(2)}`;
+    case 'scroll': return `scroll Σ ${s.total.x.toFixed(0)}, ${s.total.y.toFixed(0)} px${Math.abs(s.total.x) > Math.abs(s.total.y) && cfg.pageSwipe === '2' ? '  (horizontal: Host may turn this into a page swipe)' : ''}`;
+    case 'Spaces': case 'page swipe': case 'Notification Center':
+      return `progress ${Math.round((100 * d.x) / (W / 2))}%`;
+    case 'Mission Control': case 'App Exposé':
+      return `progress ${Math.round((100 * -d.y) / (H / 2))}%`;
+    case 'Apps': case 'Show Desktop': return `spread ${(now.spread / b.spread).toFixed(2)}`;
+    default: return `Δ ${d.x.toFixed(0)}, ${d.y.toFixed(0)}`;
+  }
+}
+
+function progressOf(list) {
+  const now = snapshot(list), b = s.base;
+  const d = { x: now.c.x - b.c.x, y: now.c.y - b.c.y };
+  const W = pad.clientWidth, H = pad.clientHeight;
+  if (['Spaces', 'page swipe', 'Notification Center'].includes(s.kind)) return Math.abs(d.x) / (W / 2);
+  if (['Mission Control', 'App Exposé'].includes(s.kind)) return Math.abs(d.y) / (H / 2);
+  return null;
+}
+
+let lastList = [];
+function onTouches(type, e) {
+  e.preventDefault();
+  const box = pad.getBoundingClientRect();
+  const list = Array.from(e.targetTouches, (t) => ({ id: t.identifier, x: t.clientX - box.left, y: t.clientY - box.top }));
+  const t = e.timeStamp;
+
+  if (type === 'cancel') log(`touchcancel: iOS took ${e.changedTouches.length} touch(es)`, 'warn');
+
+  if (!s && list.length) begin(list, t);
+  if (!s) return;
+
+  for (const f of list) {
+    if (!s.starts.has(f.id)) s.starts.set(f.id, f);
+    const o = s.starts.get(f.id);
+    s.wander = Math.max(s.wander, Math.hypot(f.x - o.x, f.y - o.y));
+  }
+
+  if (list.length && list.length !== s.base.n) {
+    // The finger count changed: start measuring again from here.
+    if (list.length > s.peak) s.peak = list.length;
+    if (!s.kind) {
+      s.base = snapshot(list);
+      s.settleAt = t + cfg.settleMs;
+      if (s.base.n === 2) s.edgeStart = s.base.c.x > pad.clientWidth - 30;
+    } else if (list.length < s.base.n) {
+      log(`${s.kind}: finger lifted (${s.base.n} → ${list.length}), gesture held`);
+      s.base = { ...snapshot(list), c: s.base.c, spread: s.base.spread, angle: s.base.angle, n: list.length };
+    }
+  }
+
+  if (type === 'move' && list.length) {
+    if (!s.kind && t >= s.settleAt) {
+      const k = classify(list, t);
+      if (k) {
+        s.kind = k;
+        s.decideMs = Math.round(t - s.t0);
+        announce(k, CLASS[k] || 'none');
+        log(`  decided after ${s.decideMs} ms with ${list.length} fingers`);
+      }
+    }
+    if (s.kind === 'scroll' && s.last) {
+      const c = centroid(list), p = centroid(s.last);
+      if (list.length === s.last.length) { s.total.x += c.x - p.x; s.total.y += c.y - p.y; }
+    }
+    if (s.kind) valsEl.textContent = values(list);
+  }
+  if (list.length) s.last = list;
+
+  if (list.length === 0) finish(t);
+  lastList = list;
+  grid.touches(list);
+  render();
+}
+
+function finish(t) {
+  const dur = t - s.t0;
+  if (!s.kind) {
+    if (dur < cfg.tapMs && s.wander < cfg.slop) tap(s.peak, t);
+    else kindEl.textContent = `(nothing: ${s.peak} finger${s.peak > 1 ? 's' : ''}, ${Math.round(dur)} ms, wander ${s.wander.toFixed(0)} px)`;
+  } else {
+    const p = s.last ? progressOf(s.last) : null;
+    if (p !== null) log(`${s.kind} released at ${Math.round(p * 100)}% → ${p * 100 >= cfg.completeAt ? 'COMPLETES' : 'cancels, springs back'}`, 'ok');
+    else log(`${s.kind} ended (${Math.round(dur)} ms)`);
+  }
+  s = null;
+}
+
+function tap(n, t) {
+  const at = s.base.c;
+  if (n === 1) { announce('click', 'pointer'); grid.tap(at.x, at.y); return; }
+  if (n === 2) {
+    if (cfg.smartZoom === 'on' && t - lastTwoTap < cfg.dblMs) {
+      lastTwoTap = 0;
+      if (pendingRight) { clearTimeout(pendingRight); pendingRight = null; log('  (pending right click dropped)'); }
+      announce('smart zoom', 'app');
+      grid.tap(at.x, at.y);
+      return;
+    }
+    lastTwoTap = t;
+    if (cfg.smartZoom === 'on' && cfg.rightClick === 'wait') {
+      log(`  two-finger tap: waiting ${cfg.dblMs} ms for a second tap…`);
+      pendingRight = setTimeout(() => { pendingRight = null; announce('right click', 'pointer'); grid.tap(at.x, at.y); }, cfg.dblMs);
+    } else {
+      announce('right click', 'pointer');
+      grid.tap(at.x, at.y);
+    }
+    return;
+  }
+  if (n === 3) { announce(cfg.lookUp === 'on' ? 'look up' : '3-finger tap (off)', 'pointer'); grid.tap(at.x, at.y); return; }
+  announce(`${n}-finger tap (nothing)`, 'none');
+}
+
+for (const [ev, type] of [['touchstart', 'start'], ['touchmove', 'move'], ['touchend', 'end'], ['touchcancel', 'cancel']]) {
+  pad.addEventListener(ev, (e) => onTouches(type, e), { passive: false });
+}
+// WebKit's own gesture events: logged, to see if they fire alongside prevented touches.
+for (const ev of ['gesturestart', 'gestureend']) {
+  document.addEventListener(ev, (e) => { e.preventDefault(); log(`${ev} (WebKit) scale ${e.scale?.toFixed(2)} rot ${e.rotation?.toFixed(0)}`); });
+}
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+
+// ---------- Dot grid, tinted by the gesture's class ----------
+
+const canvas = pad.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+const grid = createDotGrid();
+let running = false, last = 0;
+
+function draw() {
+  const w = pad.clientWidth, h = pad.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  const rest = [235, 235, 245];
+  const lit = cfg.feedback === 'plain' || !s?.kind ? COLOURS.pointer : colourOf(CLASS[s.kind]);
+  for (const d of grid.dots) {
+    const colour = rest.map((v, i) => Math.round(v + (lit[i] - v) * d.glow));
+    ctx.fillStyle = `rgba(${colour},${DOTS.idle + (0.85 - DOTS.idle) * d.glow})`;
+    ctx.beginPath();
+    ctx.arc(d.x + d.ox, d.y + d.oy, DOTS.size * (1 + 0.6 * d.glow), 0, 2 * Math.PI);
+    ctx.fill();
+  }
+}
+function frame(now) {
+  const busy = grid.step(now - last);
+  last = now;
+  draw();
+  if (busy) requestAnimationFrame(frame); else running = false;
+}
+function render() {
+  if (running) return;
+  running = true;
+  last = performance.now();
+  requestAnimationFrame(frame);
+}
+new ResizeObserver(() => {
+  const dpr = devicePixelRatio || 1;
+  canvas.width = Math.round(pad.clientWidth * dpr);
+  canvas.height = Math.round(pad.clientHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  grid.layout(pad.clientWidth, pad.clientHeight);
+  draw();
+}).observe(pad);
+</script>
+</body>
+</html>
