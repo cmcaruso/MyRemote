@@ -48,8 +48,6 @@ for (const b of modeButtons) {
     showMode(b.dataset.mode);
     // Keys raises the iOS keyboard straight away; focus has to happen inside the tap to do that.
     if (b.dataset.mode === 'keyboard') field.focus();
-    // Likewise iOS only asks for motion access from a tap.
-    if (b.dataset.mode === 'presentation') askMotion();
   });
 }
 
@@ -559,7 +557,11 @@ function setSteer(value) {
   if (steer === 'motion') askMotion(); // from the tap that chose it
 }
 
-/** Motion access: 'unknown' until asked, then 'granted' or 'denied' (then the Laser steers by drag). */
+/**
+ * Motion access: 'unknown' until asked, then 'granted' or 'denied'. iOS keeps the answer only until the app
+ * closes, so it asks again on every launch: ask when the Laser is first used, not on entering Presentation
+ * Mode, and steer by drag until it's granted.
+ */
 let motion = typeof DeviceMotionEvent?.requestPermission === 'function' ? 'unknown' : 'granted';
 async function askMotion() {
   if (motion !== 'unknown' || steer !== 'motion') return;
@@ -571,7 +573,7 @@ async function askMotion() {
   renderZone();
 }
 
-const dragging = () => steer === 'drag' || motion === 'denied';
+const dragging = () => steer === 'drag' || motion !== 'granted';
 function renderZone() {
   zone.querySelector('span').textContent = dragging() ? 'Drag for Laser' : 'Hold for Laser';
 }
@@ -615,7 +617,7 @@ for (const type of ['touchend', 'touchcancel']) {
     held = false;
     if (dragging() && type === 'touchend') linger = setTimeout(endLaser, LASER.linger);
     else endLaser();
-    // Opened straight into Presentation Mode: the first release is the first tap iOS will ask from.
+    // iOS only asks from a tap, and a release is one.
     if (type === 'touchend') askMotion();
   }, { passive: false });
 }
