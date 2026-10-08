@@ -15,6 +15,8 @@ import Foundation
 /// - `{"t":"kp","k":"left","m":["cmd"]}`: press a named `Key` with modifiers (`cmd`, `opt`, `ctrl`, `shift`; `m` optional).
 /// - `{"t":"kp","c":"z","m":["cmd"]}`: press the key that types character `c` in the Mac's layout, with modifiers.
 /// - `{"t":"as"}`: one tap of the App switcher (⌘ held for the Remote, Tab pressed).
+/// - `{"t":"ls"}` / `{"t":"le"}`: the Laser zone is held / released: show / hide the Laser.
+/// - `{"t":"l","dx":3,"dy":-1}`: move the Laser by a relative delta in points, already scaled by the Remote.
 public enum Command: Equatable, Sendable {
     case move(dx: Double, dy: Double)
     case click(Button, count: Int)
@@ -29,6 +31,9 @@ public enum Command: Equatable, Sendable {
     case key(Key, KeyFlags)
     case character(String, KeyFlags)
     case appSwitcher
+    case laserStart
+    case laserMove(dx: Double, dy: Double)
+    case laserEnd
 
     public enum Button: Sendable {
         case left, right
@@ -85,6 +90,13 @@ extension Command {
             }
         case "as":
             self = .appSwitcher
+        case "ls":
+            self = .laserStart
+        case "l":
+            guard let dx = frame.dx, let dy = frame.dy else { return nil }
+            self = .laserMove(dx: dx, dy: dy)
+        case "le":
+            self = .laserEnd
         default:
             return nil
         }

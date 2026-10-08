@@ -23,6 +23,7 @@ final class Host {
 
     private let injector = Injector()
     private let volume = Volume()
+    private let laser = LaserOverlay()
     private let clients = Clients()
     /// The last volume state pushed; CoreAudio reports one change several times.
     private var lastVolume: String?
@@ -42,10 +43,10 @@ final class Host {
         let (commands, continuation) = AsyncStream.makeStream(of: Command.self)
         Task {
             for await command in commands {
-                if case let .setVolume(level) = command {
-                    volume.set(level)
-                } else {
-                    injector.apply(command)
+                switch command {
+                case let .setVolume(level): volume.set(level)
+                case .laserStart, .laserMove, .laserEnd: laser.apply(command)
+                default: injector.apply(command)
                 }
             }
         }
@@ -63,7 +64,10 @@ final class Host {
                 await MainActor.run {
                     guard let self else { return }
                     self.remotes += delta
-                    if delta < 0 { self.injector.remoteLeft() } else { self.pushVolume(force: true) }
+                    if delta < 0 {
+                        self.injector.remoteLeft()
+                        self.laser.end()
+                    } else { self.pushVolume(force: true) }
                     self.checkServe()
                 }
             }

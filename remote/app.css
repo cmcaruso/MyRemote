@@ -200,6 +200,48 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 /* Above the iOS keyboard the panel isn't in the screen's corners. */
 .console.typing .panel.filled { padding-bottom: 8px; border-radius: 14px; }
 
+/* Presentation Mode: full panel, no trackpad, so it works by feel. Next is huge, Prev small and out
+   of the thumb's way, the Laser zone where the thumb rests. */
+.console.presenting { grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "panel" "modes"; }
+.console.presenting .padarea { display: none; }
+.console.presenting .panel.filled { padding: 10px; border-radius: var(--corner) var(--corner) 14px 14px; }
+.console.presenting .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
+.console.presenting .modes button { height: 44px; }
+.present {
+  height: 100%;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr) minmax(0, 0.8fr);
+  grid-template-areas: "prev black" "next next" "zone zone";
+}
+.present button { border-radius: 16px; background: var(--panel); font-size: 17px; font-weight: 600; }
+.present .prev { grid-area: prev; color: var(--muted); }
+.present .black { grid-area: black; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: var(--muted); }
+.present .black small { font-size: 11px; font-weight: 400; }
+.present .next { grid-area: next; font-size: 30px; background: var(--text); color: #000; }
+.present .prev.down { background: var(--panel-2); color: var(--text); }
+.present .next.down { background: #b8b8bd; }
+/* Black fills while held and goes solid when it fires. */
+.present .black::before { content: ""; position: absolute; inset: 0; background: var(--panel-2); transform: scaleX(0); transform-origin: left; }
+.present .black.down::before { transform: scaleX(1); transition: transform .6s linear; }
+.present .black.fired { background: var(--text); color: #000; }
+.present .black.fired::before { display: none; }
+.present .black > * { position: relative; }
+.present .zone {
+  grid-area: zone;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #5a1f1c;
+  border-radius: 16px;
+  color: #ff6b61;
+  background: #1a0c0b;
+  font-weight: 600;
+  touch-action: none;
+}
+.present .zone.drag span::after { content: " · drag"; }
+.present .zone.on { background: #3a1210; border-style: solid; border-color: #ff453a; box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
+
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */
 .console.full .panel { display: none; }
 .console.full .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
@@ -218,6 +260,15 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   .strip, .panel { border-radius: 14px; }
   .modes, .console.full .modes { flex-direction: column; gap: 4px; padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
   .modes button, .console.full .modes button { height: auto; font-size: 11px; }
+  .console.presenting { grid-template-columns: minmax(0, 1fr) 64px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "panel modes"; }
+  .console.presenting .panel.filled { border-radius: var(--corner) 14px 14px var(--corner); }
+  .console.presenting .modes { padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
+  .console.presenting .modes button { height: auto; }
+  .present {
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.6fr) minmax(0, 1.2fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "prev next zone" "black next zone";
+  }
   /* Typing in landscape: the trackpad gives way to the keys until the iOS keyboard hides. */
   .console.typing[data-mode="keyboard"] { grid-template-columns: minmax(0, 1fr) 64px; grid-template-areas: "panel modes"; }
   .console.typing[data-mode="keyboard"] .padarea { display: none; }

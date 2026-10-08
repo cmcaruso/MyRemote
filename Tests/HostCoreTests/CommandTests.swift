@@ -28,6 +28,11 @@ struct CommandTests {
         (#"{"t":"kp","c":"z","m":["cmd","shift"]}"#, .character("z", [.command, .shift])),
         (#"{"t":"kp","c":" ","m":["cmd"]}"#, .character(" ", .command)),
         (#"{"t":"as"}"#, .appSwitcher),
+        (#"{"t":"kp","k":"pgdn"}"#, .key(.pageDown, [])),
+        (#"{"t":"kp","k":"pgup"}"#, .key(.pageUp, [])),
+        (#"{"t":"ls"}"#, .laserStart),
+        (#"{"t":"l","dx":3,"dy":-1.5}"#, .laserMove(dx: 3, dy: -1.5)),
+        (#"{"t":"le"}"#, .laserEnd),
     ])
     func decodesEachCommand(_ text: String, _ expected: Command) {
         #expect(Command(decoding: text) == expected)
@@ -49,6 +54,7 @@ struct CommandTests {
         #"{"t":"kp","k":"tab","c":"a"}"#, // both a key and a character
         #"{"t":"kp","m":["cmd"]}"#,   // neither
         #"{"t":"kp","c":"a","m":["hyper"]}"#, // unknown modifier
+        #"{"t":"l","dx":3}"#,         // Laser move without dy
     ])
     func ignoresFramesItDoesNotUnderstand(_ text: String) {
         #expect(Command(decoding: text) == nil)

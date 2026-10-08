@@ -7,6 +7,8 @@ public enum Key: String, Sendable, CaseIterable {
     case delete = "del"
     case forwardDelete = "fwddel"
     case left, right, up, down
+    case pageUp = "pgup"
+    case pageDown = "pgdn"
 
     /// `kVK_*` from Carbon's `Events.h`.
     public var code: UInt16 {
@@ -21,15 +23,17 @@ public enum Key: String, Sendable, CaseIterable {
         case .right: 124
         case .down: 125
         case .up: 126
+        case .pageUp: 116
+        case .pageDown: 121
         }
     }
 
     /// Flags the real key carries on its own. Arrows sit on the numeric pad and the fn layer, forward
-    /// delete on the fn layer; system shortcuts such as ⌃↑ (Mission Control) only match with them.
+    /// delete and Page Up/Down on the fn layer; system shortcuts such as ⌃↑ (Mission Control) only match with them.
     public var ownFlags: KeyFlags {
         switch self {
         case .left, .right, .up, .down: [.numericPad, .function]
-        case .forwardDelete: .function
+        case .forwardDelete, .pageUp, .pageDown: .function
         default: []
         }
     }
