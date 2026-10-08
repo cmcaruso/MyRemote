@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: early. Trackpad, Keyboard and Media Modes work, and a Remote has to be paired before it can control the Mac. Presentation is being built.
+Status: early. All four Modes work, and a Remote has to be paired before it can control the Mac.
 
 ## Requirements
 
@@ -64,6 +64,10 @@ How Pairing protects the Mac:
 
 **Paired Remotes** in the menu lists each Remote with when it paired and was last used. **Revoke** one, or **Revoke All**: it's disconnected at once and goes back to the pairing screen. On the Remote, ⚙ → **Unpair this Remote** does the same from the phone.
 
+### 5. Presenting
+
+**Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks once for motion access. If you refuse, drag your thumb in the zone instead. The phone stays awake while Present is showing.
+
 ## Development
 
 ```sh
@@ -76,7 +80,7 @@ When unbundled, the Host uses your terminal app's Accessibility grant, so rebuil
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket and the `/pair` and `/unpair` requests, and posts input with `CGEvent`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).

@@ -3,7 +3,7 @@ const OPEN = 1;
 /**
  * Sends commands to the Host.
  *
- * Motion and scroll go out straight from touchmove while the socket keeps up. While it is backed up
+ * Motion, scroll and Laser motion go out straight from touchmove while the socket keeps up. While it is backed up
  * (bufferedAmount > 0) their deltas are summed (and only the newest volume level kept) and sent as
  * one frame each by `drain()`, which the
  * Remote calls once per animation frame. Discrete commands (clicks, button down/up, scroll end) go out
@@ -15,6 +15,7 @@ export function createSender(socket) {
   const pending = {
     m: { dx: 0, dy: 0 },
     s: { dx: 0, dy: 0 },
+    l: { dx: 0, dy: 0 },
   };
   let volume = null; // newest level not sent yet
 
@@ -47,6 +48,10 @@ export function createSender(socket) {
     /** Adds a scroll delta in Host pixels. */
     scroll(dx, dy) {
       add('s', dx, dy);
+    },
+    /** Adds a Laser delta in Host points. */
+    laser(dx, dy) {
+      add('l', dx, dy);
     },
     /** Sets the Mac's output volume, 0 to 1; under backpressure only the newest level goes out. */
     volume(v) {
