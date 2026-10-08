@@ -61,13 +61,16 @@
     <section class="panel" id="panel"></section>
     <dialog class="sheet" id="sheet">
       <form method="dialog">
-        <h2>Settings</h2>
-        <div id="settings"></div>
-        <div class="sheet-buttons">
-          <button type="button" id="reset">Reset</button>
-          <button value="done">Done</button>
+        <div class="grabber"></div>
+        <header class="sheet-head">
+          <h2>Settings</h2>
+          <button class="done" value="done">Done</button>
+        </header>
+        <div class="sheet-body">
+          <div id="settings"></div>
+          <div class="group"><button type="button" class="row action" id="reset">Reset to Defaults</button></div>
+          <div class="group"><button type="button" class="row action danger" id="unpair">Unpair this Remote</button></div>
         </div>
-        <button type="button" class="unpair" id="unpair">Unpair this Remote</button>
       </form>
     </dialog>
   </main>
