@@ -1,0 +1,98 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway, not production. Answers: "What should the polished Remote look like, and how
+  should the trackpad's reacting dot grid behave?"
+  Trackpad Mode restyled (tokens, depth, SVG icons, tab-bar Modes) with three dot-grid effects, switchable
+  via ?variant=A|B|C and the magenta pill: A Glow, B Grow, C Repel. "Tune" adjusts the grid live (kept in
+  the URL, so a reload or a shared link keeps it). The gear opens the restyled settings sheet.
+  Nothing is sent to a Host. Tap the green dot to fake a dropped connection.
+  Run: node prototypes/ui-polish/serve.mjs  (quit the MyRemote Host first: it holds port 8484)
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="UI proto">
+  <meta name="theme-color" content="#000000">
+  <title>UI Polish Prototype</title>
+  <link rel="stylesheet" href="proto.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-touchpad" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M2 14h20"/><path d="M12 20v-6"/></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
+      <symbol id="i-media" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+      <symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-updown" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+    </defs>
+  </svg>
+
+  <main class="console" id="console">
+    <div class="padarea">
+      <div class="pad" id="pad">
+        <canvas class="dots" id="dots"></canvas>
+        <button class="conn on" id="conn" aria-label="Connected (tap to fake a drop)"></button>
+        <button class="gear" id="gear" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></button>
+      </div>
+      <div class="strip" id="strip" aria-label="Scroll"><svg class="icon"><use href="#i-updown"/></svg></div>
+    </div>
+    <nav class="modes" id="modes">
+      <button class="on" data-mode="trackpad"><svg class="icon"><use href="#i-touchpad"/></svg><span>Trackpad</span></button>
+      <button data-mode="keyboard"><svg class="icon"><use href="#i-keyboard"/></svg><span>Keys</span></button>
+      <button data-mode="media"><svg class="icon"><use href="#i-media"/></svg><span>Media</span></button>
+      <button data-mode="presentation"><svg class="icon"><use href="#i-present"/></svg><span>Present</span></button>
+    </nav>
+  </main>
+
+  <dialog class="sheet" id="sheet">
+    <form method="dialog">
+      <div class="grabber"></div>
+      <header class="sheet-head">
+        <h2>Settings</h2>
+        <button class="done" value="done">Done</button>
+      </header>
+      <div class="sheet-body">
+        <h3>Trackpad</h3>
+        <div class="group">
+          <div class="row slider-row"><div class="row-top"><span>Speed</span><output>1.6</output></div><input type="range" min="0.5" max="4" step="0.1" value="1.6"></div>
+          <div class="row slider-row"><div class="row-top"><span>Acceleration</span><output>1.2</output></div><input type="range" min="0" max="4" step="0.1" value="1.2"></div>
+          <div class="row slider-row"><div class="row-top"><span>Scroll speed</span><output>1.5</output></div><input type="range" min="0.3" max="4" step="0.1" value="1.5"></div>
+          <label class="row"><span>Momentum</span><input type="checkbox" role="switch" checked></label>
+          <label class="row"><span>Pad effect</span><input type="checkbox" role="switch" id="effect-switch" checked></label>
+        </div>
+        <p class="foot">Momentum lets the Mac keep scrolling after a two-finger flick.</p>
+
+        <h3>Present</h3>
+        <div class="group">
+          <div class="row"><span>Laser</span><div class="seg"><button type="button" class="on">Motion</button><button type="button">Drag</button></div></div>
+          <div class="row"><span>Upside down</span><div class="seg"><button type="button" class="on">Auto</button><button type="button">Off</button></div></div>
+          <div class="row"><span>Echo guard</span><div class="seg"><button type="button" class="on">On</button><button type="button">Off</button></div></div>
+        </div>
+        <p class="foot">Echo guard keeps a room's speakers from feeding back into the Phone Mic.</p>
+
+        <div class="group"><button type="button" class="row action">Reset to Defaults</button></div>
+        <div class="group"><button type="button" class="row action danger">Unpair this Remote</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Prototype chrome: not part of the design. -->
+  <div class="proto" id="proto">
+    <div class="proto-bar">
+      <button id="prev" aria-label="Previous variant">‹</button>
+      <span id="label"></span>
+      <button id="next" aria-label="Next variant">›</button>
+      <button id="tune-btn" class="tune-btn">Tune</button>
+    </div>
+    <div class="proto-tune" id="tune" hidden></div>
+    <div class="proto-state" id="state"></div>
+  </div>
+
+  <script src="proto.js"></script>
+</body>
+</html>

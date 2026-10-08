@@ -1,0 +1,212 @@
+/* PROTOTYPE — throwaway. The polished look as tokens; Trackpad Mode only, plus the settings sheet. */
+:root {
+  color-scheme: dark;
+  --bg: #000;
+  --surface-1: #0b0b0d;   /* pad */
+  --surface-2: #1c1c1e;   /* bars, groups */
+  --surface-3: #2c2c2e;   /* controls on a surface */
+  --surface-4: #3a3a3c;   /* selected / pressed */
+  --hairline: rgb(255 255 255 / .08);
+  --highlight: inset 0 1px 0 rgb(255 255 255 / .06);
+  --text: #f5f5f7;
+  --muted: #8e8e93;
+  --accent: #0a84ff;
+  --ok: #30d158;
+  --bad: #ff453a;
+  --radius-s: 9px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --corner: 50px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+  background: var(--bg); color: var(--text);
+  font: 15px/1.3 -apple-system, system-ui, sans-serif;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; border: 0; padding: 0; background: none; }
+.icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.console {
+  position: fixed; inset: 0;
+  display: grid; gap: 6px; padding: 4px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "pad" "modes";
+}
+.padarea { grid-area: pad; display: flex; gap: 6px; min-height: 0; }
+
+.pad {
+  position: relative; flex: 1; min-width: 0; overflow: hidden;
+  background: radial-gradient(140% 90% at 50% 0%, #131317, var(--surface-1) 70%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--corner) 18px 18px 18px;
+  box-shadow: var(--highlight);
+  touch-action: none;
+  transition: border-color .2s, background-color .2s;
+}
+.pad.drag { border-color: rgb(10 132 255 / .45); }
+.dots { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.strip {
+  width: 44px; flex: none; display: grid; place-items: center;
+  color: var(--muted);
+  background: linear-gradient(var(--surface-2), #161618);
+  border: 1px solid var(--hairline);
+  border-radius: 14px var(--corner) 14px 14px;
+  box-shadow: var(--highlight);
+  touch-action: none;
+  transition: background .15s, color .15s;
+}
+.strip .icon { width: 20px; height: 20px; }
+.strip.on { background: var(--surface-3); color: var(--text); }
+
+.conn {
+  position: absolute; top: 14px; right: 14px; width: 22px; height: 22px;
+  display: grid; place-items: center;
+}
+.conn::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--bad); box-shadow: 0 0 0 3px rgb(255 69 58 / .18), 0 0 10px rgb(255 69 58 / .5);
+  transition: background .3s, box-shadow .3s;
+}
+.conn.on::before { background: var(--ok); box-shadow: 0 0 0 3px rgb(48 209 88 / .16), 0 0 10px rgb(48 209 88 / .45); }
+
+.gear {
+  position: absolute; left: 16px; bottom: 12px;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--muted);
+  background: rgb(44 44 46 / .55);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: var(--highlight);
+  transition: transform .12s var(--ease), color .12s;
+}
+.gear:active { transform: scale(.92); color: var(--text); }
+.gear .icon { width: 20px; height: 20px; }
+
+/* Modes as an iOS tab bar: icon over label, tinted when selected. */
+.modes {
+  grid-area: modes; display: flex;
+  padding: 6px 20px 8px;
+  background: linear-gradient(var(--surface-2), #151517);
+  border: 1px solid var(--hairline);
+  border-radius: 14px 14px var(--corner) var(--corner);
+  box-shadow: var(--highlight);
+}
+.modes button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 0 4px; border-radius: 10px;
+  font-size: 10.5px; font-weight: 500; color: var(--muted);
+  transition: color .15s, transform .12s var(--ease);
+}
+.modes button .icon { width: 24px; height: 24px; }
+.modes button:active { transform: scale(.94); }
+.modes button.on { color: var(--accent); }
+
+@media (orientation: landscape) {
+  .console {
+    grid-template-columns: minmax(0, 1fr) 64px;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "pad modes";
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+  .pad { border-radius: var(--corner) 14px 14px var(--corner); }
+  .strip { border-radius: 14px; }
+  .modes { flex-direction: column; gap: 4px; padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
+  .modes button span { display: none; }
+}
+
+/* ---------- Settings: an iOS bottom sheet with inset grouped rows ---------- */
+.sheet {
+  margin: auto auto 0; width: 100%; max-width: 520px; max-height: 88dvh;
+  padding: 0; color: var(--text);
+  background: #111113;
+  border: 0; border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgb(0 0 0 / .5), var(--highlight);
+  transition: transform .35s var(--ease), overlay .35s allow-discrete, display .35s allow-discrete;
+  transform: translateY(100%);
+}
+.sheet[open] { transform: translateY(0); }
+@starting-style { .sheet[open] { transform: translateY(100%); } }
+.sheet::backdrop { background: rgb(0 0 0 / 0); transition: background .35s, overlay .35s allow-discrete, display .35s allow-discrete; }
+.sheet[open]::backdrop { background: rgb(0 0 0 / .5); }
+@starting-style { .sheet[open]::backdrop { background: rgb(0 0 0 / 0); } }
+.sheet form { display: flex; flex-direction: column; max-height: 88dvh; }
+.grabber { width: 36px; height: 5px; margin: 6px auto 0; border-radius: 3px; background: var(--surface-4); }
+.sheet-head { position: relative; display: grid; place-items: center; height: 44px; }
+.sheet-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sheet-head .done { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); font-weight: 600; font-size: 17px; }
+.sheet-body { overflow: auto; padding: 4px 16px calc(24px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+.sheet h3 { margin: 18px 16px 6px; font-size: 13px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+.group { overflow: hidden; background: var(--surface-2); border-radius: 12px; box-shadow: var(--highlight); }
+.group + .group { margin-top: 18px; }
+.foot + .group { margin-top: 22px; }
+.sheet button:focus { outline: none; }
+.foot { margin: 6px 16px 0; font-size: 13px; color: var(--muted); line-height: 1.35; }
+.row {
+  position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 46px; padding: 8px 16px; text-align: left;
+}
+.row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline); }
+.slider-row { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 16px 12px; }
+.row-top { display: flex; justify-content: space-between; }
+.row output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.action { justify-content: center; color: var(--accent); font-size: 16px; }
+.action.danger { color: var(--bad); }
+.action:active { background: var(--surface-3); }
+
+/* Range: a thin track with an accent fill and a white thumb, like iOS. */
+input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 28px; margin: 0; background: none;
+  --p: 50%;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--surface-4) var(--p));
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 28px; height: 28px; margin-top: -12px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / .35), 0 0 0 .5px rgb(0 0 0 / .1);
+}
+
+/* Switch: the iOS toggle on a plain checkbox. */
+input[role=switch] {
+  -webkit-appearance: none; appearance: none; position: relative; flex: none;
+  width: 51px; height: 31px; margin: 0; border-radius: 16px;
+  background: var(--surface-4); transition: background .2s;
+}
+input[role=switch]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgb(0 0 0 / .3);
+  transition: transform .25s var(--ease);
+}
+input[role=switch]:checked { background: var(--ok); }
+input[role=switch]:checked::after { transform: translateX(20px); }
+
+.seg { display: flex; padding: 2px; background: var(--surface-3); border-radius: 9px; min-width: 150px; }
+.seg button { flex: 1; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--text); transition: background .2s; }
+.seg button.on { background: #636366; box-shadow: 0 2px 6px rgb(0 0 0 / .3), var(--highlight); }
+
+/* ---------- Prototype chrome (not the design) ---------- */
+.proto { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 50; width: min(360px, calc(100vw - 100px)); font: 12px/1.3 ui-monospace, Menlo, monospace; }
+.proto-bar { display: flex; align-items: center; gap: 6px; padding: 4px; background: #e0218a; color: #fff; border-radius: 999px; box-shadow: 0 4px 14px rgb(0 0 0 / .5); }
+.proto-bar button { min-width: 32px; height: 28px; border-radius: 999px; background: rgb(0 0 0 / .2); font-size: 16px; }
+.proto-bar #label { flex: 1; text-align: center; font-weight: 700; }
+.proto-bar .tune-btn { padding: 0 10px; font-size: 12px; font-weight: 700; }
+.proto-state { margin-top: 4px; text-align: center; color: #e0218a; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.proto-tune { margin-top: 6px; padding: 10px 12px; background: rgb(30 10 22 / .92); border: 1px solid #e0218a; border-radius: 14px; color: #fff; }
+.proto-tune[hidden] { display: none; }
+.proto-tune .t { display: grid; grid-template-columns: 6.5em 1fr 3.2em; align-items: center; gap: 8px; min-height: 30px; }
+.proto-tune input[type=range] { height: 24px; --p: 50%; }
+.proto-tune input[type=range]::-webkit-slider-runnable-track { background: linear-gradient(to right, #e0218a var(--p), #553 var(--p)); }
+.proto-tune input[type=range]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8px; }
+.proto-tune output { text-align: right; }
+.proto-tune .opts { display: flex; gap: 4px; }
+.proto-tune .opts button { flex: 1; height: 26px; border-radius: 7px; background: rgb(255 255 255 / .1); font-size: 11px; }
+.proto-tune .opts button.on { background: #e0218a; }
+.proto-tune .actions { display: flex; gap: 6px; margin-top: 8px; }
+.proto-tune .actions button { flex: 1; height: 30px; border-radius: 8px; background: rgb(255 255 255 / .12); font-size: 12px; }
