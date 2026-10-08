@@ -1,3 +1,4 @@
+import { createKeyboard } from './keyboard.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -6,7 +7,6 @@ import { createVolumeSlider } from './volume-slider.js';
 
 const MODES = ['trackpad', 'keyboard', 'media', 'presentation'];
 const PLACEHOLDER = {
-  keyboard: 'Keyboard Mode is coming.',
   presentation: 'Presentation Mode is coming.',
 };
 /** Mode panels that exist so far, by Mode; built further down. */
@@ -27,6 +27,13 @@ function storedMode() {
 }
 
 function showMode(mode) {
+  // Switching Mode dismisses the iOS keyboard, and the Mac's text cursor may move meanwhile.
+  if (mode !== app.dataset.mode) {
+    field.blur();
+    keyboard.reset();
+    renderKeys();
+  }
+  app.dataset.mode = mode;
   app.classList.toggle('full', mode === 'trackpad');
   if (PANELS[mode]) panel.replaceChildren(PANELS[mode]);
   else panel.textContent = PLACEHOLDER[mode] ?? '';
@@ -35,7 +42,13 @@ function showMode(mode) {
   try { localStorage.setItem('mode', mode); } catch {}
 }
 
-for (const b of modeButtons) b.addEventListener('click', () => showMode(b.dataset.mode));
+for (const b of modeButtons) {
+  b.addEventListener('click', () => {
+    showMode(b.dataset.mode);
+    // Keys raises the iOS keyboard straight away; focus has to happen inside the tap to do that.
+    if (b.dataset.mode === 'keyboard') field.focus();
+  });
+}
 
 // ---------- Connection ----------
 
@@ -232,6 +245,8 @@ function listen(el, recognizer, onCommands = () => {}) {
 
 listen(pad, () => trackpad, (commands) => {
   for (const c of commands) {
+    // A click may move the Mac's text cursor: don't let a later correction erase across it.
+    if (c.t === 'c' || c.t === 'd') resetTyping();
     if (c.t === 'd') pad.classList.add('drag');
     if (c.t === 'u') pad.classList.remove('drag');
   }
@@ -294,5 +309,149 @@ for (const type of ['touchend', 'touchcancel']) {
   }, { passive: false });
 }
 renderVolume();
+
+// ---------- Keyboard Mode ----------
+
+const keyboard = createKeyboard();
+const keys = document.createElement('div');
+keys.className = 'keys';
+keys.innerHTML = `
+  <label class="typed">
+    <span class="text"></span>
+    <textarea rows="1" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"
+      enterkeyhint="enter" aria-label="Type on the Mac"></textarea>
+  </label>
+  <div class="keyrow">
+    <button data-key="esc">esc</button>
+    <button data-key="tab">tab</button>
+    <button data-mod="ctrl" aria-label="Control">⌃</button>
+    <button data-mod="opt" aria-label="Option">⌥</button>
+    <button data-mod="cmd" aria-label="Command">⌘</button>
+    <button data-mod="shift" aria-label="Shift">⇧</button>
+  </div>
+  <div class="keyrow">
+    <button data-key="left" data-repeat aria-label="Left">←</button>
+    <button data-key="up" data-repeat aria-label="Up">↑</button>
+    <button data-key="down" data-repeat aria-label="Down">↓</button>
+    <button data-key="right" data-repeat aria-label="Right">→</button>
+    <button data-key="fwddel" data-repeat aria-label="Forward delete">⌦</button>
+    <button data-toggle class="toggle" aria-label="Show or hide the keyboard">⌨︎</button>
+  </div>
+  <div class="keyrow palette">
+    <button data-palette="appSwitcher">App switcher</button>
+    <button data-palette="spotlight">Spotlight</button>
+    <button data-palette="missionControl">Mission Control</button>
+  </div>`;
+PANELS.keyboard = keys;
+
+const field = keys.querySelector('textarea');
+const typedText = keys.querySelector('.typed .text');
+const typing = () => document.activeElement === field;
+
+function renderKeys() {
+  typedText.textContent = keyboard.typed;
+  for (const b of keys.querySelectorAll('[data-mod]')) {
+    const state = keyboard.mods.state(b.dataset.mod);
+    b.classList.toggle('once', state === 'once');
+    b.classList.toggle('locked', state === 'locked');
+  }
+}
+
+/** Sets the field to what the keyboard model expects, with the caret at the end. */
+function syncField() {
+  if (field.value !== keyboard.field) field.value = keyboard.field;
+  field.setSelectionRange(field.value.length, field.value.length);
+}
+
+function resetTyping() {
+  keyboard.reset();
+  syncField();
+  renderKeys();
+}
+
+field.addEventListener('input', () => {
+  dispatch(keyboard.input(field.value));
+  syncField();
+  renderKeys();
+});
+
+// While the iOS keyboard is up, fit the console into what's left of the screen above it.
+function fitViewport() {
+  const vv = window.visualViewport;
+  if (vv && typing()) {
+    app.style.top = `${vv.offsetTop}px`;
+    app.style.height = `${vv.height}px`;
+  } else {
+    app.style.removeProperty('top');
+    app.style.removeProperty('height');
+  }
+}
+window.visualViewport?.addEventListener('resize', fitViewport);
+window.visualViewport?.addEventListener('scroll', fitViewport);
+
+field.addEventListener('focus', () => {
+  app.classList.add('typing');
+  syncField();
+  fitViewport();
+});
+field.addEventListener('blur', () => {
+  app.classList.remove('typing');
+  fitViewport();
+});
+
+/** Auto-repeat for held arrows and ⌦: 400 ms, then about 30 a second. */
+let repeat = null;
+function startRepeat(commands) {
+  stopRepeat();
+  repeat = setTimeout(function again() {
+    dispatch(commands);
+    repeat = setTimeout(again, 33);
+  }, 400);
+}
+function stopRepeat() {
+  clearTimeout(repeat);
+  repeat = null;
+}
+
+// Keys act on touch-down, and cancelling it keeps the focus (and the iOS keyboard) where it is.
+keys.addEventListener('touchstart', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.preventDefault();
+  b.classList.add('down');
+  if (b.dataset.mod) {
+    keyboard.mods.tap(b.dataset.mod, e.timeStamp);
+  } else if (b.dataset.key) {
+    const commands = keyboard.key(b.dataset.key);
+    dispatch(commands);
+    if ('repeat' in b.dataset) startRepeat(commands);
+    syncField();
+  }
+  renderKeys();
+}, { passive: false });
+
+function lift(e) {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.preventDefault();
+  b.classList.remove('down');
+  stopRepeat();
+  if (e.type === 'touchcancel') return;
+  // These change focus, which iOS allows only on touch-up.
+  if ('toggle' in b.dataset) {
+    if (typing()) field.blur();
+    else field.focus();
+  } else if (b.dataset.palette) {
+    dispatch(keyboard[b.dataset.palette]());
+    syncField();
+    renderKeys();
+    if (b.dataset.palette === 'spotlight') field.focus();
+  }
+}
+keys.addEventListener('touchend', lift, { passive: false });
+keys.addEventListener('touchcancel', lift, { passive: false });
+
+syncField();
+renderKeys();
 
 showMode(storedMode());

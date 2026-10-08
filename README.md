@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: early. Trackpad and Media Modes work, and a Remote has to be paired before it can control the Mac. Keyboard and Presentation are being built.
+Status: early. Trackpad, Keyboard and Media Modes work, and a Remote has to be paired before it can control the Mac. Presentation is being built.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ When unbundled, the Host uses your terminal app's Accessibility grant, so rebuil
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket and the `/pair` and `/unpair` requests, and posts input with `CGEvent`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).

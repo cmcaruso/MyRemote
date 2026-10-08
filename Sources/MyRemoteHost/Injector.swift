@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import CoreGraphics
 import HostCore
 
@@ -12,6 +13,9 @@ final class Injector {
     private var momentum: Task<Void, Never>?
     /// The left button is down for a drag, so moves post `leftMouseDragged`.
     private var buttonHeld = false
+    private var switcher = AppSwitcher()
+    /// Lets go of ⌘ once the App switcher's taps stop.
+    private var switcherRelease: Task<Void, Never>?
 
     init() {
         // Don't freeze the Mac's own trackpad after each posted event.
@@ -44,6 +48,17 @@ final class Injector {
             postMediaKey(key, down: false)
         case .setVolume:
             break // the Host sets volume through CoreAudio, not input events
+        case let .type(backspaces, text):
+            for _ in 0..<backspaces { Keystrokes.press(Key.delete).forEach(post) }
+            type(text)
+        case let .key(key, flags):
+            Keystrokes.press(key, flags: flags).forEach(post)
+        case let .character(character, flags):
+            guard let press = Self.currentLayout().press(character, flags: flags) else { return }
+            Keystrokes.press(press.code, flags: press.flags).forEach(post)
+        case .appSwitcher:
+            switcher.tap(at: Self.uptime()).forEach(post)
+            releaseSwitcherWhenIdle()
         }
     }
 
@@ -51,6 +66,7 @@ final class Injector {
     func remoteLeft() {
         release()
         stopMomentum()
+        switcher.releaseNow().forEach(post)
     }
 
     private func release() {
@@ -90,6 +106,61 @@ final class Injector {
             timestamp: 0, windowNumber: 0, context: nil,
             subtype: 8, data1: key.eventData(down: down), data2: -1)
         event?.cgEvent?.post(tap: .cghidEventTap)
+    }
+
+    private func post(_ key: KeyEvent) {
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: key.code, keyDown: key.down) else { return }
+        if key.isModifier { event.type = .flagsChanged }
+        event.flags = CGEventFlags(rawValue: key.flags.rawValue)
+        event.post(tap: .cghidEventTap)
+    }
+
+    /// Types text as Unicode-string key events, which come out the same whatever the Mac's layout.
+    private func type(_ text: String) {
+        for run in Keystrokes.chunks(text) {
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down) else { continue }
+                event.flags = []
+                run.withUnsafeBufferPointer { event.keyboardSetUnicodeString(stringLength: run.count, unicodeString: $0.baseAddress) }
+                event.post(tap: .cghidEventTap)
+            }
+        }
+    }
+
+    private func releaseSwitcherWhenIdle() {
+        guard switcherRelease == nil else { return } // already waiting; the tap pushed the deadline back
+        switcherRelease = Task { [weak self] in
+            while let self, let at = self.switcher.releaseAt {
+                try? await Task.sleep(for: .seconds(max(0, at - Self.uptime())))
+                self.switcher.release(at: Self.uptime()).forEach(self.post)
+            }
+            self?.switcherRelease = nil
+        }
+    }
+
+    private static func uptime() -> Double {
+        ProcessInfo.processInfo.systemUptime
+    }
+
+    /// The keyboard layout the Mac types with right now, read through Text Input Sources.
+    private static func currentLayout() -> KeyLayout {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return .us }
+        let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        return data.withUnsafeBytes { bytes in
+            guard let layout = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return .us }
+            return KeyLayout { code, shift in
+                var deadKeys: UInt32 = 0
+                var length = 0
+                var characters = [UniChar](repeating: 0, count: 4)
+                let status = UCKeyTranslate(
+                    layout, code, UInt16(kUCKeyActionDown), shift ? UInt32(shiftKey >> 8) : 0,
+                    UInt32(LMGetKbdType()), OptionBits(1 << kUCKeyTranslateNoDeadKeysBit),
+                    &deadKeys, characters.count, &length, &characters)
+                guard status == noErr, length > 0 else { return nil }
+                return String(utf16CodeUnits: characters, count: length)
+            }
+        }
     }
 
     private func post(_ scroll: ScrollEvent) {
