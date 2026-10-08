@@ -465,10 +465,35 @@ present.innerHTML = `
   <button class="prev" data-slide="pgup" aria-label="Previous slide">‹ Prev</button>
   <button class="black" aria-label="Black screen (hold)">Black<small>hold</small></button>
   <button class="next" data-slide="pgdn" aria-label="Next slide">Next ›</button>
-  <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>`;
+  <div class="aim">
+    <div class="aim-switch" role="tablist">
+      <button data-aim="laser" role="tab">Laser</button>
+      <button data-aim="pointer" role="tab">Pointer</button>
+    </div>
+    <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>
+    <div class="pointer-pad" aria-label="Trackpad for the pointer"></div>
+  </div>`;
 PANELS.presentation = present;
 
 const zone = present.querySelector('.zone');
+const pointerPad = present.querySelector('.pointer-pad');
+
+// The aim area is either the Laser zone or a trackpad for the real pointer, say to click a link or
+// start a video; the choice is kept per device.
+function setAim(aim) {
+  present.dataset.aim = aim;
+  for (const b of present.querySelectorAll('[data-aim]')) b.classList.toggle('on', b.dataset.aim === aim);
+  try { localStorage.setItem('aim', aim); } catch {}
+}
+for (const b of present.querySelectorAll('[data-aim]')) b.addEventListener('click', () => setAim(b.dataset.aim));
+setAim((() => { try { return localStorage.getItem('aim') === 'pointer' ? 'pointer' : 'laser'; } catch { return 'laser'; } })());
+
+listen(pointerPad, () => trackpad, (commands) => {
+  for (const c of commands) {
+    if (c.t === 'd') pointerPad.classList.add('drag');
+    if (c.t === 'u') pointerPad.classList.remove('drag');
+  }
+});
 const black = present.querySelector('.black');
 
 // Next and Prev act on touch-down, like a clicker.

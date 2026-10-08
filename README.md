@@ -66,7 +66,7 @@ How Pairing protects the Mac:
 
 ### 5. Presenting
 
-**Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks once for motion access. If you refuse, drag your thumb in the zone instead. The phone stays awake while Present is showing.
+**Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks once for motion access. If you refuse, drag your thumb in the zone instead. Switch the zone from **Laser** to **Pointer** to get a trackpad for the real pointer, say to click a link or start a video. The phone stays awake while Present is showing.
 
 ## Development
 

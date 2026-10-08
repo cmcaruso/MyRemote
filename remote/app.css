@@ -212,7 +212,7 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   display: grid;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: 64px minmax(0, 1fr) minmax(0, 0.8fr);
+  grid-template-rows: 64px minmax(0, 1fr) minmax(0, 0.9fr);
   grid-template-areas: "prev black" "next next" "zone zone";
 }
 .present button { border-radius: 16px; background: var(--panel); font-size: 17px; font-weight: 600; }
@@ -228,8 +228,24 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .present .black.fired { background: var(--text); color: #000; }
 .present .black.fired::before { display: none; }
 .present .black > * { position: relative; }
+/* The aim area: a Laser | Pointer switch over the Laser zone or a trackpad for the real pointer. */
+.present .aim { grid-area: zone; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.aim-switch { display: flex; flex: none; padding: 3px; background: var(--panel); border-radius: 11px; }
+.present .aim-switch button { flex: 1; height: 30px; border-radius: 8px; background: none; font-size: 13px; font-weight: 600; color: var(--muted); }
+.present .aim-switch button.on { background: var(--panel-2); color: var(--text); }
+.present[data-aim="laser"] .pointer-pad, .present[data-aim="pointer"] .zone { display: none; }
+.present .pointer-pad {
+  flex: 1;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  touch-action: none;
+}
+.present .pointer-pad.drag { background: #151a24; border-color: #2c3a55; }
 .present .zone {
-  grid-area: zone;
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
   border: 1px dashed #5a1f1c;
