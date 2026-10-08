@@ -17,6 +17,9 @@ final class Host {
     private(set) var serve: ServeCheck?
     private(set) var loginItem = LoginItem.status
     private(set) var loginItemError: String?
+    let pairings = PairingStore()
+    /// The time the menu's "last used" is counted from, refreshed with the status checks.
+    private(set) var now = Date.now
 
     private let injector = Injector()
     private let volume = Volume()
@@ -55,6 +58,7 @@ final class Host {
             port: port,
             commands: continuation,
             clients: clients,
+            pairings: pairings,
             onRemote: { [weak self] delta in
                 await MainActor.run {
                     guard let self else { return }
@@ -83,6 +87,7 @@ final class Host {
             while true {
                 checkServe()
                 loginItem = LoginItem.status
+                now = .now
                 try? await Task.sleep(for: .seconds(30))
             }
         }
@@ -101,6 +106,13 @@ final class Host {
             loginItemError = error.localizedDescription
         }
         loginItem = LoginItem.status
+    }
+
+    /// Revokes one paired Remote, or all of them when `id` is nil, and drops their live connections.
+    func revoke(_ id: Pairing.Remote.ID?) {
+        if let id { pairings.revoke(id) } else { pairings.revokeAll() }
+        let clients = clients
+        Task { await clients.unpair(id) }
     }
 
     func copy(_ text: String) {
