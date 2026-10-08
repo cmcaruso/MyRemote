@@ -90,10 +90,20 @@ button .icon { pointer-events: none; }
   touch-action: none;
   transition: background .15s, color .15s;
 }
-.conn { position: absolute; top: 14px; right: 14px; pointer-events: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
-.conn.on { background: var(--ok); }
+.conn {
+  position: absolute; top: 14px; right: 14px; pointer-events: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--bad); box-shadow: 0 0 0 3px rgb(255 69 58 / .18), 0 0 10px rgb(255 69 58 / .5);
+  transition: background .3s, box-shadow .3s;
+}
+.conn.on { background: var(--ok); box-shadow: 0 0 0 3px rgb(48 209 88 / .16), 0 0 10px rgb(48 209 88 / .45); }
 /* The Phone Mic is on, shown in every Mode. */
-.mic-dot { position: absolute; top: 9px; right: 28px; pointer-events: none; padding: 1px 5px; border-radius: 6px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; }
+.mic-dot {
+  position: absolute; top: 8px; right: 30px; pointer-events: none;
+  display: flex; align-items: center; gap: 3px; height: 20px; padding: 0 8px 0 6px; border-radius: 10px;
+  background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  box-shadow: 0 2px 8px rgb(255 69 58 / .4);
+}
+.mic-dot .icon { width: 12px; height: 12px; stroke-width: 2.4; }
 .mic-dot[hidden] { display: none; }
 
 .pad.drag { border-color: var(--accent-line); }
@@ -180,15 +190,32 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 .pairing[hidden] { display: none; }
 .pairing form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 340px; text-align: center; }
 .pairing h1 { margin: 0; font-size: 24px; }
+.pair-glyph {
+  display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 6px; border-radius: 18px;
+  color: #fff; background: linear-gradient(160deg, #3a9bff, var(--accent) 60%, #0060df);
+  box-shadow: 0 10px 30px rgb(10 132 255 / .35), inset 0 1px 0 rgb(255 255 255 / .3);
+}
+.pair-glyph .icon { width: 38px; height: 38px; stroke-width: 1.6; }
 .pairing p { margin: 0; color: var(--muted); line-height: 1.4; }
 .pairing .hint { color: var(--warn); }
-.pairing input {
-  height: 64px; border: 1px solid var(--hairline); border-radius: 14px;
-  color: var(--text); background: var(--surface-1);
-  font: 600 32px ui-monospace, Menlo, monospace; letter-spacing: .15em; text-align: center;
+/* Six digit cells drawn over by one real, invisible field, so iOS can still fill in the code. */
+.code { position: relative; display: flex; justify-content: center; gap: 8px; margin: 8px 0 0; }
+.code .cell {
+  display: grid; place-items: center; width: 46px; height: 60px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--hairline); box-shadow: var(--highlight);
+  font: 600 28px ui-monospace, Menlo, monospace; transition: border-color .15s, box-shadow .15s;
 }
+.code .cell:nth-child(3) { margin-right: 10px; }
+.code .cell.at { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(10 132 255 / .25); }
+.pairing .code input {
+  position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0;
+  color: transparent; caret-color: transparent; background: transparent; font-size: 16px;
+  -webkit-user-select: text; user-select: text;
+}
+.pairing .code input::selection { background: transparent; }
 .pairing .error { min-height: 1.4em; color: var(--bad); }
-.pairing button { height: 50px; border-radius: 14px; background: var(--accent); font-weight: 600; }
+.pairing button { height: 50px; border-radius: 14px; background: var(--accent); font-weight: 600; box-shadow: var(--highlight); }
+.pairing button:active { transform: scale(.97); }
 .pairing button:disabled { opacity: .5; }
 
 .modes { grid-area: modes; display: flex; padding: 3px; background: var(--raised); border: 1px solid var(--hairline); border-radius: 11px; box-shadow: var(--highlight); }
@@ -220,7 +247,12 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 .transport { display: flex; justify-content: center; align-items: center; gap: 18px; }
 .transport button { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--raised); }
 .transport button .icon { width: 24px; height: 24px; }
-.transport .play { width: 84px; height: 84px; background: var(--text); color: #000; }
+.transport .play {
+  width: 84px; height: 84px; color: #000;
+  background: linear-gradient(#fff, #e3e3e8);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .5), inset 0 -2px 0 rgb(0 0 0 / .08);
+}
+.transport .play:active { background: #c7c7cc; }
 .transport .play .icon { width: 30px; height: 30px; }
 .volume { display: flex; align-items: center; gap: 6px; }
 .volume > button { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--raised); }
@@ -230,6 +262,9 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 .slider.muted .fill { background: var(--surface-3); }
 .slider.fixed { opacity: .5; }
 .slider span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+.slider .icon { position: absolute; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: rgb(255 255 255 / .85); }
+.slider .lo { left: 12px; }
+.slider .hi { right: 12px; color: var(--muted); }
 /* Raised controls catch the light on their top edge, and sink a little when pressed. */
 .transport button, .volume > button, .slider, .keyrow button, .present button, .aim-switch { box-shadow: var(--highlight); }
 .transport button:active, .volume > button:active { background: var(--surface-3); transform: scale(.95); }
@@ -281,12 +316,18 @@ input[role=switch]:checked::after { transform: translateX(20px); }
   user-select: text;
 }
 .keyrow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-.keyrow button { display: grid; place-items: center; height: 42px; border-radius: 9px; background: var(--raised); font-size: 17px; }
+.keyrow button {
+  display: grid; place-items: center; height: 42px; border-radius: 9px; font-size: 17px;
+  background: linear-gradient(#2b2b2e, #1e1e21);
+}
+/* Keycaps: lit along the top, a shadow under the bottom edge. */
+.keyrow button, .keyrow button.down { box-shadow: inset 0 1px 0 rgb(255 255 255 / .07), 0 1px 0 rgb(0 0 0 / .7); }
 .keyrow button .icon { width: 20px; height: 20px; }
 .keyrow [data-key="esc"], .keyrow [data-key="tab"] { font-size: 14px; }
 .keyrow button.down { background: var(--surface-3); }
-.keyrow button.once { background: var(--accent); color: #fff; }
-.keyrow button.locked { background: var(--text); color: #000; }
+.keyrow button.once { background: var(--accent); color: #fff; box-shadow: 0 0 12px rgb(10 132 255 / .45), inset 0 1px 0 rgb(255 255 255 / .2); }
+/* Locked: white, with an accent bar along the bottom like a caps-lock light. */
+.keyrow button.locked { background: var(--text); color: #000; box-shadow: inset 0 -3px 0 var(--accent), 0 1px 0 rgb(0 0 0 / .7); }
 .keyrow .toggle { color: var(--muted); }
 .console.typing .keyrow .toggle { color: var(--accent); }
 .palette { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -317,9 +358,13 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 .present .next .icon { width: 34px; height: 34px; margin-right: -10px; stroke-width: 2.2; }
 .present .black { grid-area: black; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: var(--muted); }
 .present .black small { font-size: 11px; font-weight: 400; }
-.present .next { grid-area: next; font-size: 30px; background: var(--text); color: #000; }
+.present .next {
+  grid-area: next; font-size: 30px; color: #000;
+  background: linear-gradient(#fff, #e3e3e8);
+  box-shadow: 0 10px 28px rgb(0 0 0 / .45), inset 0 -2px 0 rgb(0 0 0 / .08);
+}
 .present .prev.down { background: var(--surface-3); color: var(--text); }
-.present .next.down { background: #b8b8bd; }
+.present .next.down { background: #c7c7cc; }
 /* Black fills while held and goes solid when it fires. */
 .present .black::before { content: ""; position: absolute; inset: 0; background: var(--surface-3); transform: scaleX(0); transform-origin: left; }
 .present .black.down::before { transform: scaleX(1); transition: transform .6s linear; }
@@ -335,7 +380,8 @@ input[role=switch]:checked::after { transform: translateX(20px); }
 .present .mic { display: flex; align-items: center; justify-content: center; gap: 4px; flex: none; min-width: 72px; padding: 0 12px; border-radius: 11px; font-size: 13px; color: var(--muted); }
 .present .mic .icon { width: 16px; height: 16px; }
 .present .mic.starting { color: var(--text); }
-.present .mic.live { background: var(--bad); color: #fff; }
+.present .mic.live { background: var(--bad); color: #fff; animation: mic-live 1.6s ease-out infinite; }
+@keyframes mic-live { from { box-shadow: 0 0 0 0 rgb(255 69 58 / .6); } to { box-shadow: 0 0 0 10px rgb(255 69 58 / 0); } }
 .present .mic.denied { color: var(--bad); }
 .present .aim-switch button { flex: 1; height: 30px; border-radius: 8px; background: none; font-size: 13px; font-weight: 600; color: var(--muted); }
 .present .aim-switch button.on { background: var(--surface-3); color: var(--text); }
@@ -356,14 +402,20 @@ input[role=switch]:checked::after { transform: translateX(20px); }
   min-height: 0;
   display: grid;
   place-items: center;
-  border: 1px dashed var(--laser-line);
+  border: 1.5px dashed var(--laser-line);
   border-radius: 16px;
   color: var(--laser);
-  background: var(--laser-bg);
+  background: radial-gradient(closest-side, rgb(255 69 58 / .08), transparent) var(--laser-bg);
   font-weight: 600;
   touch-action: none;
+  transition: background-color .2s, border-color .2s;
 }
-.present .zone.on { background: var(--laser-on); border-style: solid; border-color: var(--bad); box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
+/* The label leads with a dot like the Laser's own. */
+.present .zone span { display: flex; align-items: center; gap: 8px; }
+.present .zone span::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+.present .zone.on { background-color: var(--laser-on); border-style: solid; border-color: var(--bad); animation: laser-held 1.2s ease-in-out infinite alternate; }
+@keyframes laser-held { from { box-shadow: inset 0 0 24px rgb(255 69 58 / .25); } to { box-shadow: inset 0 0 48px rgb(255 69 58 / .45); } }
+@media (prefers-reduced-motion: reduce) { .present .zone.on, .present .mic.live { animation: none; } }
 
 /* Upside down (Present, portrait): the console turns round in place, being fixed to the whole screen.
    The settings sheet sits in the top layer, outside the console's transform, so it turns on its own. */

@@ -47,7 +47,7 @@
     <div class="padarea">
       <div class="pad" id="pad">
         <span class="conn" id="conn" title="Disconnected"></span>
-        <span class="mic-dot" id="mic-dot" hidden>MIC</span>
+        <span class="mic-dot" id="mic-dot" hidden><svg class="icon"><use href="#i-mic"/></svg>MIC</span>
         <button class="gear" id="gear" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></button>
       </div>
       <div class="strip" id="strip" aria-label="Scroll"><svg class="icon"><use href="#i-updown"/></svg></div>
@@ -76,10 +76,14 @@
   </main>
   <section class="pairing" id="pairing" hidden>
     <form id="pair-form">
+      <div class="pair-glyph"><svg class="icon"><use href="#i-pointer"/></svg></div>
       <h1>Pair with your Mac</h1>
       <p>On the Mac, choose <b>Pair a Remote…</b> in the MyRemote menu and type the code it shows.</p>
       <p class="hint" id="pair-hint" hidden>Add the Remote to your Home Screen first, then pair there: Safari keeps its own pairing.</p>
-      <input id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" aria-label="Pairing code">
+      <label class="code">
+        <span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span><span class="cell"></span>
+        <input id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" aria-label="Pairing code">
+      </label>
       <p class="error" id="pair-error" role="alert"></p>
       <button id="pair-button">Pair</button>
     </form>
