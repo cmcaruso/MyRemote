@@ -49,10 +49,13 @@ function createFlick(p) {
   };
 }
 
+/** How many Host pixels a finger moving at `v` px/ms covers per pixel: the acceleration curve. */
+export const pointerGain = (p, v) => p.sens * Math.min(p.cap, 1 + p.accel * Math.pow(v, p.exp));
+
 /** @param {Partial<typeof DEFAULTS>} [params] */
 export function createTrackpad(params = {}) {
   const p = { ...DEFAULTS, ...params };
-  const gain = (v) => p.sens * Math.min(p.cap, 1 + p.accel * Math.pow(v, p.exp));
+  const gain = (v) => pointerGain(p, v);
 
   /** idle | one (one finger) | two (two fingers, not scrolling yet) | scroll | done (wait for all fingers up) */
   let mode = 'idle';

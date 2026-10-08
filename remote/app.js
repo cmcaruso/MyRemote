@@ -1,5 +1,5 @@
 import { createKeyboard } from './keyboard.js';
-import { LASER, airDelta, rotationVector } from './laser.js';
+import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -31,7 +31,7 @@ function showMode(mode) {
     keyboard.reset();
     renderKeys();
   }
-  if (mode !== 'presentation' && lasing) endLaser();
+  if (mode !== 'presentation' && shown) endLaser();
   app.dataset.mode = mode;
   app.classList.toggle('full', mode === 'trackpad');
   app.classList.toggle('presenting', mode === 'presentation');
@@ -187,6 +187,12 @@ const settings = document.getElementById('settings');
 
 function renderSettings() {
   settings.replaceChildren();
+  const heading = (text) => {
+    const h = document.createElement('h3');
+    h.textContent = text;
+    settings.append(h);
+  };
+  heading('Trackpad');
   for (const [key, label, min, max, step] of SETTINGS) {
     const row = document.createElement('div');
     row.className = 'setting';
@@ -208,11 +214,27 @@ function renderSettings() {
   box.checked = params.momentum;
   box.addEventListener('change', () => { params.momentum = box.checked; saveParams(); });
   settings.append(row);
+
+  heading('Laser');
+  const steering = document.createElement('div');
+  steering.className = 'setting';
+  steering.innerHTML = `<label>Steer with</label><div class="seg">
+    <button type="button" data-steer="motion">Motion</button><button type="button" data-steer="drag">Drag</button></div>`;
+  for (const b of steering.querySelectorAll('[data-steer]')) {
+    b.classList.toggle('on', b.dataset.steer === steer);
+    b.addEventListener('click', () => { setSteer(b.dataset.steer); renderSettings(); });
+  }
+  settings.append(steering);
 }
 
-document.getElementById('gear').addEventListener('click', () => { renderSettings(); sheet.showModal(); });
+function openSettings() {
+  renderSettings();
+  sheet.showModal();
+}
+document.getElementById('gear').addEventListener('click', openSettings);
 document.getElementById('reset').addEventListener('click', () => {
   params = { ...DEFAULTS };
+  setSteer('motion');
   saveParams();
   renderSettings();
 });
@@ -465,10 +487,39 @@ present.innerHTML = `
   <button class="prev" data-slide="pgup" aria-label="Previous slide">‹ Prev</button>
   <button class="black" aria-label="Black screen (hold)">Black<small>hold</small></button>
   <button class="next" data-slide="pgdn" aria-label="Next slide">Next ›</button>
-  <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>`;
+  <div class="aim">
+    <div class="aim-bar">
+      <div class="aim-switch" role="tablist">
+        <button data-aim="laser" role="tab">Laser</button>
+        <button data-aim="pointer" role="tab">Pointer</button>
+      </div>
+      <button class="aim-gear" aria-label="Settings">⚙︎</button>
+    </div>
+    <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>
+    <div class="pointer-pad" aria-label="Trackpad for the pointer"></div>
+  </div>`;
 PANELS.presentation = present;
 
 const zone = present.querySelector('.zone');
+const pointerPad = present.querySelector('.pointer-pad');
+present.querySelector('.aim-gear').addEventListener('click', openSettings);
+
+// The aim area is either the Laser zone or a trackpad for the real pointer, say to click a link or
+// start a video; the choice is kept per device.
+function setAim(aim) {
+  present.dataset.aim = aim;
+  for (const b of present.querySelectorAll('[data-aim]')) b.classList.toggle('on', b.dataset.aim === aim);
+  try { localStorage.setItem('aim', aim); } catch {}
+}
+for (const b of present.querySelectorAll('[data-aim]')) b.addEventListener('click', () => setAim(b.dataset.aim));
+setAim((() => { try { return localStorage.getItem('aim') === 'pointer' ? 'pointer' : 'laser'; } catch { return 'laser'; } })());
+
+listen(pointerPad, () => trackpad, (commands) => {
+  for (const c of commands) {
+    if (c.t === 'd') pointerPad.classList.add('drag');
+    if (c.t === 'u') pointerPad.classList.remove('drag');
+  }
+});
 const black = present.querySelector('.black');
 
 // Next and Prev act on touch-down, like a clicker.
@@ -499,58 +550,88 @@ for (const type of ['touchend', 'touchcancel']) {
   });
 }
 
-/** Motion access: 'unknown' until asked, then 'granted' or 'denied' (the Laser falls back to dragging). */
+/** How the Laser is steered, per device: turning the phone (`motion`) or the thumb (`drag`). */
+let steer = (() => { try { return localStorage.getItem('laserSteer') === 'drag' ? 'drag' : 'motion'; } catch { return 'motion'; } })();
+function setSteer(value) {
+  steer = value;
+  try { localStorage.setItem('laserSteer', value); } catch {}
+  renderZone();
+  if (steer === 'motion') askMotion(); // from the tap that chose it
+}
+
+/** Motion access: 'unknown' until asked, then 'granted' or 'denied' (then the Laser steers by drag). */
 let motion = typeof DeviceMotionEvent?.requestPermission === 'function' ? 'unknown' : 'granted';
 async function askMotion() {
-  if (motion !== 'unknown') return;
+  if (motion !== 'unknown' || steer !== 'motion') return;
   try {
     motion = (await DeviceMotionEvent.requestPermission()) === 'granted' ? 'granted' : 'denied';
   } catch {
     // Not inside a tap: ask again on the next one.
   }
-  zone.classList.toggle('drag', motion === 'denied');
+  renderZone();
 }
 
-let lasing = false;
+const dragging = () => steer === 'drag' || motion === 'denied';
+function renderZone() {
+  zone.querySelector('span').textContent = dragging() ? 'Drag for Laser' : 'Hold for Laser';
+}
+renderZone();
+
+let held = false; // a thumb is on the zone
+let shown = false; // the Host is showing the dot
+let linger = null; // timer that hides the dot after a drag
 let lastMotion = null; // time of the last motion sample while held, ms
-let lastTouch = null; // finger position while dragging, when there's no motion access
+let lastTouch = null; // { x, y, t } of the thumb while dragging
 
 zone.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  if (lasing) return;
-  lasing = true;
+  if (held) return;
+  held = true;
   lastMotion = null;
-  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp };
   zone.classList.add('on');
-  sender.send({ t: 'ls' });
+  // A new swipe while the dot lingers carries on from where it is.
+  clearTimeout(linger);
+  linger = null;
+  if (!shown) {
+    shown = true;
+    sender.send({ t: 'ls' });
+  }
 }, { passive: false });
 
 zone.addEventListener('touchmove', (e) => {
   e.preventDefault();
-  if (!lasing || motion === 'granted') return;
+  if (!held || !dragging()) return;
   const t = e.targetTouches[0];
-  sender.laser((t.clientX - lastTouch.x) * LASER.drag, (t.clientY - lastTouch.y) * LASER.drag);
-  lastTouch = { x: t.clientX, y: t.clientY };
+  const { dx, dy } = dragDelta(t.clientX - lastTouch.x, t.clientY - lastTouch.y, e.timeStamp - lastTouch.t, params);
+  sender.laser(dx, dy);
+  lastTouch = { x: t.clientX, y: t.clientY, t: e.timeStamp };
 }, { passive: false });
 
 for (const type of ['touchend', 'touchcancel']) {
   zone.addEventListener(type, (e) => {
     e.preventDefault();
-    if (e.targetTouches.length > 0 || !lasing) return;
-    endLaser();
+    if (e.targetTouches.length > 0 || !held) return;
+    held = false;
+    if (dragging() && type === 'touchend') linger = setTimeout(endLaser, LASER.linger);
+    else endLaser();
     // Opened straight into Presentation Mode: the first release is the first tap iOS will ask from.
     if (type === 'touchend') askMotion();
   }, { passive: false });
 }
 
 function endLaser() {
-  lasing = false;
+  held = false;
+  clearTimeout(linger);
+  linger = null;
   zone.classList.remove('on');
+  if (!shown) return;
+  shown = false;
   sender.send({ t: 'le' });
 }
 
 window.addEventListener('devicemotion', (e) => {
-  if (!lasing || !e.rotationRate) return;
+  if (!held || dragging() || !e.rotationRate) return;
   const dt = lastMotion === null ? 0 : Math.min((e.timeStamp - lastMotion) / 1000, 0.1);
   lastMotion = e.timeStamp;
   const angle = screen.orientation?.angle ?? window.orientation ?? 0;
