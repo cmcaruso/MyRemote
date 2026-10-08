@@ -38,6 +38,20 @@ public enum MenuText {
         }
     }
 
+    /// The Phone Mic's status, and how to get BlackHole when it's missing: without it there's no
+    /// microphone a call can pick, only outputs like the speakers.
+    public static func phoneMic(live: Bool, output: String?, blackHoleInstalled: Bool) -> [MenuLine] {
+        let status = switch (live, output) {
+        case (_, nil): "Phone Mic: no output picked, the Mac doesn't play it"
+        case let (true, output?): "Phone Mic: live → \(output)"
+        case let (false, output?): "Phone Mic: off, sends to \(output)"
+        }
+        guard !blackHoleInstalled else { return [MenuLine(status)] }
+        return [MenuLine(status),
+                MenuLine("For calls, install BlackHole 2ch and choose it as the microphone",
+                         copy: command("brew install --cask blackhole-2ch"))]
+    }
+
     private static func command(_ text: String) -> MenuLine.Copy {
         .init(label: "Copy Command: \(text)", text: text)
     }

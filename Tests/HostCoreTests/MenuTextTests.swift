@@ -32,6 +32,24 @@ struct MenuTextTests {
         ])
     }
 
+    @Test func saysWhereThePhoneMicGoes() {
+        #expect(MenuText.phoneMic(live: false, output: "BlackHole 2ch", blackHoleInstalled: true)
+            == [MenuLine("Phone Mic: off, sends to BlackHole 2ch")])
+        #expect(MenuText.phoneMic(live: true, output: "BlackHole 2ch", blackHoleInstalled: true)
+            == [MenuLine("Phone Mic: live → BlackHole 2ch")])
+        #expect(MenuText.phoneMic(live: true, output: nil, blackHoleInstalled: true)
+            == [MenuLine("Phone Mic: no output picked, the Mac doesn't play it")])
+    }
+
+    @Test func offersToInstallBlackHoleForCalls() {
+        #expect(MenuText.phoneMic(live: false, output: "MacBook Pro Speakers", blackHoleInstalled: false) == [
+            MenuLine("Phone Mic: off, sends to MacBook Pro Speakers"),
+            MenuLine("For calls, install BlackHole 2ch and choose it as the microphone",
+                     copy: .init(label: "Copy Command: brew install --cask blackhole-2ch",
+                                 text: "brew install --cask blackhole-2ch")),
+        ])
+    }
+
     @Test func offersTheServeCommandForTheHostsPortWhenServeMissesIt() {
         #expect(MenuText.serve(.notServing, port: 9000) == [
             MenuLine("tailscale serve doesn't reach the Host",

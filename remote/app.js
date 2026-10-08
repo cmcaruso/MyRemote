@@ -1,5 +1,7 @@
+import { createFlip } from './flip.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
+import { createGate, createHowlDetector, createMicEncoder, isPhoneMic, placeNotch, shouldDrop } from './mic.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -38,7 +40,8 @@ function showMode(mode) {
   if (PANELS[mode]) panel.replaceChildren(PANELS[mode]);
   else panel.replaceChildren();
   panel.classList.toggle('filled', Boolean(PANELS[mode]));
-  keepAwake(mode === 'presentation');
+  renderFlip();
+  keepAwake(wantAwake());
   for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === mode);
   try { localStorage.setItem('mode', mode); } catch {}
 }
@@ -58,8 +61,10 @@ let sender = createSender({ readyState: 3, bufferedAmount: 0, send() {} });
 /** The Host closes the socket with this when the Remote isn't paired, or was just revoked. */
 const UNPAIRED = 4401;
 
+const socketURL = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
+
 function connect() {
-  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  const socket = new WebSocket(socketURL('/ws'));
   sender = createSender(socket);
   socket.addEventListener('open', () => conn.classList.add('on'));
   socket.addEventListener('message', (e) => {
@@ -102,6 +107,7 @@ function showPairing(why) {
   const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
   document.getElementById('pair-hint').hidden = standalone;
   pairing.hidden = false;
+  stopMic();
 }
 
 async function pair() {
@@ -213,16 +219,21 @@ function renderSettings() {
   box.addEventListener('change', () => { params.momentum = box.checked; saveParams(); });
   settings.append(row);
 
-  heading('Laser');
-  const steering = document.createElement('div');
-  steering.className = 'setting';
-  steering.innerHTML = `<label>Steer with</label><div class="seg">
-    <button type="button" data-steer="motion">Motion</button><button type="button" data-steer="drag">Drag</button></div>`;
-  for (const b of steering.querySelectorAll('[data-steer]')) {
-    b.classList.toggle('on', b.dataset.steer === steer);
-    b.addEventListener('click', () => { setSteer(b.dataset.steer); renderSettings(); });
-  }
-  settings.append(steering);
+  heading('Present');
+  const segmented = (label, options, value, choose) => {
+    const row = document.createElement('div');
+    row.className = 'setting';
+    row.innerHTML = `<label>${label}</label><div class="seg">${options.map(([v, text]) =>
+      `<button type="button" data-value="${v}">${text}</button>`).join('')}</div>`;
+    for (const b of row.querySelectorAll('[data-value]')) {
+      b.classList.toggle('on', b.dataset.value === value);
+      b.addEventListener('click', () => { choose(b.dataset.value); renderSettings(); });
+    }
+    settings.append(row);
+  };
+  segmented('Laser', [['motion', 'Motion'], ['drag', 'Drag']], steer, setSteer);
+  segmented('Upside down', [['auto', 'Auto'], ['off', 'Off']], flipSetting, setFlip);
+  segmented('Echo guard', [['on', 'On'], ['off', 'Off']], guard, setGuard);
 }
 
 function openSettings() {
@@ -233,6 +244,8 @@ document.getElementById('gear').addEventListener('click', openSettings);
 document.getElementById('reset').addEventListener('click', () => {
   params = { ...DEFAULTS };
   setSteer('motion');
+  setFlip('auto');
+  setGuard('on');
   saveParams();
   renderSettings();
 });
@@ -249,7 +262,9 @@ function rebuildGestures() {
 }
 rebuildGestures();
 
-const touchesOf = (list) => Array.from(list, (t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+/** Where a touch is as the user sees it: mirrored while the Remote is upside down, so motion follows the thumb. */
+const point = (t) => (flipped ? { x: innerWidth - t.clientX, y: innerHeight - t.clientY } : { x: t.clientX, y: t.clientY });
+const touchesOf = (list) => Array.from(list, (t) => ({ id: t.identifier, ...point(t) }));
 
 /** Feeds a surface's touches to its gesture recognizer; motion is sent straight from touchmove. */
 function listen(el, recognizer, onCommands = () => {}) {
@@ -491,6 +506,7 @@ present.innerHTML = `
         <button data-aim="laser" role="tab">Laser</button>
         <button data-aim="pointer" role="tab">Pointer</button>
       </div>
+      <button class="mic" aria-label="Phone Mic" aria-pressed="false">Mic</button>
       <button class="aim-gear" aria-label="Settings">⚙︎</button>
     </div>
     <div class="zone" role="button" aria-label="Laser (hold)"><span>Hold for Laser</span></div>
@@ -563,10 +579,12 @@ function setSteer(value) {
  * Mode, and steer by drag until it's granted.
  */
 let motion = typeof DeviceMotionEvent?.requestPermission === 'function' ? 'unknown' : 'granted';
-async function askMotion() {
-  if (motion !== 'unknown' || steer !== 'motion') return;
+async function askMotion(forFlip = false) {
+  if (motion !== 'unknown' || (forFlip ? flipSetting !== 'auto' : steer !== 'motion')) return;
   try {
     motion = (await DeviceMotionEvent.requestPermission()) === 'granted' ? 'granted' : 'denied';
+    // The tilt comes from orientation events, which iOS grants with motion: this answers without asking.
+    if (motion === 'granted') globalThis.DeviceOrientationEvent?.requestPermission?.()?.catch(() => {});
   } catch {
     // Not inside a tap: ask again on the next one.
   }
@@ -590,7 +608,7 @@ zone.addEventListener('touchstart', (e) => {
   if (held) return;
   held = true;
   lastMotion = null;
-  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp };
+  lastTouch = { ...point(e.touches[0]), t: e.timeStamp };
   zone.classList.add('on');
   // A new swipe while the dot lingers carries on from where it is.
   clearTimeout(linger);
@@ -604,10 +622,10 @@ zone.addEventListener('touchstart', (e) => {
 zone.addEventListener('touchmove', (e) => {
   e.preventDefault();
   if (!held || !dragging()) return;
-  const t = e.targetTouches[0];
-  const { dx, dy } = dragDelta(t.clientX - lastTouch.x, t.clientY - lastTouch.y, e.timeStamp - lastTouch.t, params);
+  const t = point(e.targetTouches[0]);
+  const { dx, dy } = dragDelta(t.x - lastTouch.x, t.y - lastTouch.y, e.timeStamp - lastTouch.t, params);
   sender.laser(dx, dy);
-  lastTouch = { x: t.clientX, y: t.clientY, t: e.timeStamp };
+  lastTouch = { ...t, t: e.timeStamp };
 }, { passive: false });
 
 for (const type of ['touchend', 'touchcancel']) {
@@ -636,12 +654,238 @@ window.addEventListener('devicemotion', (e) => {
   if (!held || dragging() || !e.rotationRate) return;
   const dt = lastMotion === null ? 0 : Math.min((e.timeStamp - lastMotion) / 1000, 0.1);
   lastMotion = e.timeStamp;
-  const angle = screen.orientation?.angle ?? window.orientation ?? 0;
+  // iOS keeps a portrait angle of 0 upside down; the Remote's own turn adds the other half.
+  const angle = (screen.orientation?.angle ?? window.orientation ?? 0) + (flipped ? 180 : 0);
   const { dx, dy } = airDelta(rotationVector(e.rotationRate), e.accelerationIncludingGravity ?? {}, angle, dt);
   if (dx || dy) sender.laser(dx, dy);
 });
 
-// Keep the screen on while presenting. iOS drops the lock when the app goes to the background.
+// ---------- Upside down ----------
+
+/**
+ * Held upside down, mic toward the mouth, the Remote turns itself round: iPhones with Face ID never rotate
+ * a page upside down. Only while the Phone Mic records from the iPhone's own mic, the one reason to hold it
+ * that way: with AirPods, or the mic off, a phone held loosely with its top down mustn't turn the buttons
+ * round under the thumb. In Presentation Mode and portrait, from the tilt, once motion access is granted;
+ * 'off' per device keeps it the right way up.
+ */
+let flipSetting = (() => { try { return localStorage.getItem('flip') === 'off' ? 'off' : 'auto'; } catch { return 'auto'; } })();
+const tilt = createFlip();
+const portrait = matchMedia('(orientation: portrait)');
+let flipped = false;
+
+function setFlip(value) {
+  flipSetting = value;
+  try { localStorage.setItem('flip', value); } catch {}
+  renderFlip();
+  askMotion(true); // from the tap that chose it
+}
+
+function renderFlip() {
+  flipped = flipSetting === 'auto' && mic?.onPhone === true && app.dataset.mode === 'presentation'
+    && portrait.matches && tilt.flipped;
+  app.classList.toggle('flipped', flipped);
+}
+window.addEventListener('deviceorientation', (e) => {
+  const before = tilt.flipped;
+  if (tilt.update(e.beta, e.timeStamp) !== before) renderFlip();
+});
+portrait.addEventListener('change', renderFlip);
+
+// ---------- Phone Mic ----------
+
+/**
+ * The Phone Mic streams the iPhone's microphone to the Host, which plays it into BlackHole for a call to
+ * pick as its microphone, or into another output. It has its own socket, so audio never holds up
+ * commands, and it stays on in every Mode until it's tapped off.
+ */
+const micButton = present.querySelector('.mic');
+const micDot = document.getElementById('mic-dot');
+/** off | starting | live | denied */
+let micState = 'off';
+/** The running Phone Mic: { context, module, stream, source, socket, timer }, or null. */
+let mic = null;
+
+const MIC_LABELS = { off: 'Mic', starting: 'Mic…', live: 'Mic on', denied: 'No mic' };
+function renderMic() {
+  micButton.textContent = MIC_LABELS[micState];
+  micButton.className = `mic ${micState}`;
+  micButton.setAttribute('aria-pressed', String(mic !== null));
+  micDot.hidden = mic === null;
+  keepAwake(wantAwake());
+  renderFlip();
+}
+
+micButton.addEventListener('click', () => {
+  if (mic) {
+    stopMic();
+    return;
+  }
+  // The AudioContext has to start inside the tap, before anything is awaited.
+  const context = new AudioContext();
+  context.resume().catch(() => {});
+  mic = { context, module: context.audioWorklet.addModule('mic-worklet.js'), stream: null, source: null, socket: null, timer: null };
+  micState = 'starting';
+  renderMic();
+  captureMic(mic);
+  askMotion(true); // turning round needs motion access, and this is a tap
+});
+
+async function captureMic(m) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      // No auto-gain: in the pauses it turns up the room, and through a room's speakers, the Phone Mic itself.
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
+    });
+    if (mic !== m) {
+      for (const track of stream.getTracks()) track.stop();
+      return;
+    }
+    m.stream = stream;
+    m.onPhone = isPhoneMic(stream.getAudioTracks()[0]?.label);
+    m.inputs = await audioInputs();
+    renderFlip();
+    await m.module;
+    if (mic !== m) return;
+    const { context } = m;
+    const encoder = createMicEncoder({ inRate: context.sampleRate });
+    const gate = createGate({ rate: context.sampleRate });
+    const tap = new AudioWorkletNode(context, 'mic-tap');
+    // Safari runs a worklet only when it leads to the output, so it does, silently.
+    const silent = context.createGain();
+    silent.gain.value = 0;
+    m.source = context.createMediaStreamSource(stream);
+    // The echo guard's filters: a low cut, then notches the howl detector tunes, flat until it does.
+    const lowCut = new BiquadFilterNode(context, { type: 'highpass', frequency: 100 });
+    m.notches = Array.from({ length: 4 }, () => ({
+      frequency: null,
+      filter: new BiquadFilterNode(context, { type: 'peaking', Q: 30, gain: 0 }),
+    }));
+    let chain = m.source.connect(lowCut);
+    for (const notch of m.notches) chain = chain.connect(notch.filter);
+    chain.connect(tap).connect(silent).connect(context.destination);
+    const analyser = new AnalyserNode(context, { fftSize: 2048, smoothingTimeConstant: 0 });
+    chain.connect(analyser);
+    listenForHowl(m, analyser);
+    tap.port.onmessage = (e) => {
+      const socket = m.socket;
+      for (const frame of encoder.push(guard === 'on' ? gate.process(e.data) : e.data)) {
+        if (socket?.readyState === WebSocket.OPEN && !shouldDrop(socket.bufferedAmount, encoder.rate)) socket.send(frame);
+      }
+    };
+    // iOS ends the track when something else takes the microphone; take it back.
+    stream.getAudioTracks()[0]?.addEventListener('ended', () => { if (mic === m) recaptureMic(m); });
+    if (!m.socket) openMicSocket(m, encoder.rate);
+  } catch (e) {
+    if (mic !== m) return;
+    stopMic();
+    if (e?.name === 'NotAllowedError') {
+      micState = 'denied';
+      renderMic();
+    }
+  }
+}
+
+/** Checks for feedback 20 times a second, and notches out each tone it finds. */
+function listenForHowl(m, analyser) {
+  clearInterval(m.howl);
+  const detect = createHowlDetector({ rate: m.context.sampleRate, bins: analyser.frequencyBinCount });
+  const spectrum = new Float32Array(analyser.frequencyBinCount);
+  m.howl = setInterval(() => {
+    if (guard !== 'on') return;
+    analyser.getFloatFrequencyData(spectrum);
+    const frequency = detect.update(spectrum, m.context.currentTime);
+    if (frequency === null) return;
+    const { index, gain } = placeNotch(m.notches.map((n) => n.frequency), frequency);
+    const notch = m.notches[index];
+    notch.frequency = frequency;
+    notch.filter.frequency.value = frequency;
+    notch.filter.gain.value = gain;
+  }, 50);
+}
+
+/**
+ * The echo guard, per device: through a room's speakers the Phone Mic hears itself, so a voice gate turns
+ * the room down between words and notches take out feedback as it starts. 'off' sends the mic as it is.
+ */
+let guard = (() => { try { return localStorage.getItem('micGuard') === 'off' ? 'off' : 'on'; } catch { return 'on'; } })();
+function setGuard(value) {
+  guard = value;
+  try { localStorage.setItem('micGuard', value); } catch {}
+  // Off leaves the sound alone, so the notches go flat too; they're found again when it's back on.
+  for (const notch of mic?.notches ?? []) {
+    notch.frequency = null;
+    notch.filter.gain.value = 0;
+  }
+}
+
+/** Gets the microphone again after iOS took it away, keeping the socket and the AudioContext. */
+function recaptureMic(m) {
+  m.source?.disconnect();
+  for (const track of m.stream?.getTracks() ?? []) track.stop();
+  m.stream = null;
+  captureMic(m);
+}
+
+function openMicSocket(m, rate) {
+  const socket = new WebSocket(socketURL(`/mic?rate=${rate}`));
+  socket.binaryType = 'arraybuffer';
+  m.socket = socket;
+  socket.addEventListener('open', () => {
+    if (mic !== m) return;
+    micState = 'live';
+    renderMic();
+  });
+  socket.addEventListener('close', (e) => {
+    if (mic !== m) return;
+    // Unpaired: the control socket shows Pairing, which stops the mic.
+    if (e.code === UNPAIRED) return;
+    micState = 'starting';
+    renderMic();
+    m.timer = setTimeout(() => { if (mic === m) openMicSocket(m, rate); }, 1000);
+  });
+}
+
+function stopMic() {
+  const m = mic;
+  mic = null;
+  micState = 'off';
+  renderMic();
+  if (!m) return;
+  clearTimeout(m.timer);
+  clearInterval(m.howl);
+  m.socket?.close();
+  for (const track of m.stream?.getTracks() ?? []) track.stop();
+  m.context.close().catch(() => {});
+}
+
+/** The microphones iOS offers now, as one comparable string. */
+async function audioInputs() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((d) => d.kind === 'audioinput').map((d) => d.deviceId).join(' ');
+  } catch {
+    return '';
+  }
+}
+
+// AirPods or a headset came or went: iOS moves the input, so take the mic again, from where it is now.
+navigator.mediaDevices?.addEventListener('devicechange', async () => {
+  const m = mic;
+  if (!m?.stream) return;
+  const inputs = await audioInputs();
+  if (mic === m && m.stream && inputs !== m.inputs) recaptureMic(m);
+});
+
+// Back from the background: iOS may have paused the audio or ended the track.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !mic) return;
+  mic.context.resume().catch(() => {});
+  if (mic.stream?.getAudioTracks()[0]?.readyState === 'ended') recaptureMic(mic);
+});
+
+// Keep the screen on while presenting or the Phone Mic is on. iOS drops the lock when the app goes to the background.
+const wantAwake = () => app.dataset.mode === 'presentation' || mic !== null;
 let wakeLock = null;
 async function keepAwake(on) {
   if (!on) {
@@ -653,7 +897,7 @@ async function keepAwake(on) {
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') keepAwake(app.dataset.mode === 'presentation');
+  if (document.visibilityState === 'visible') keepAwake(wantAwake());
 });
 
 showMode(storedMode());
