@@ -2,13 +2,13 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: early. All four Modes work, and a Remote has to be paired before it can control the Mac.
+Status: v1. All four Modes work, and a Remote has to be paired before it can control the Mac. There are no prebuilt downloads: you build it from source for your own Mac and tailnet. One install serves one user and one Mac.
 
 ## Requirements
 
 - A Mac on macOS 15 or later, with the Swift 6 toolchain (Xcode, or just the Command Line Tools: `xcode-select --install`).
 - An iPhone on iOS 18.4 or later.
-- Tailscale on both, logged in to the same tailnet.
+- [Tailscale](https://tailscale.com/download) on both, logged in to the same tailnet.
 - Node 24, only to run the Remote's tests.
 
 ## Build from source
@@ -28,12 +28,14 @@ Status: early. All four Modes work, and a Remote has to be paired before it can 
 ### 2. Build and run
 
 ```sh
+git clone https://github.com/cmcaruso/MyRemote.git
+cd MyRemote
 scripts/bundle.sh --run
 ```
 
 This builds `build/MyRemote.app` and opens it. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted". You can move the app to `/Applications` if you like.
 
-The app is signed ad hoc, so macOS asks for Accessibility again after every rebuild. `--run` quits System Settings and clears the old entry first. If the switch is on but the pointer doesn't move, remove MyRemote from the list with **−** and add `build/MyRemote.app` again with **+**. If you rebuild often, sign with a code-signing identity of your own: copy `scripts/signing.local.example` to `scripts/signing.local` (it's git-ignored) and set `MYREMOTE_SIGN_IDENTITY`. The grant then survives rebuilds.
+The app is signed ad hoc, so macOS asks for Accessibility again after every rebuild. `--run` quits System Settings and clears the old entry first. If the switch is on but the pointer doesn't move, remove MyRemote from the list with **−** and add `build/MyRemote.app` again with **+**. If you rebuild often, sign with a code-signing identity of your own. A self-signed one is enough: in Keychain Access, choose Keychain Access → Certificate Assistant → **Create a Certificate…**, give it a name, set Certificate Type to **Code Signing**, and create it. Then copy `scripts/signing.local.example` to `scripts/signing.local` (it's git-ignored) and set `MYREMOTE_SIGN_IDENTITY`. The grant then survives rebuilds.
 
 The Host listens on `127.0.0.1:8484`. To use another port, run `defaults write io.github.cmcaruso.myremote port 9000` (or the bundle ID you set), and point `tailscale serve` at the same port.
 
@@ -68,6 +70,13 @@ How Pairing protects the Mac:
 
 **Present** turns the Remote into a clicker: **Next** and **Prev** send Page Down and Page Up, and holding **Black** for a moment sends `B` (black screen in Keynote and PowerPoint). Hold the red zone to show the **Laser**, a red dot on the display with the cursor, and turn the phone to steer it. If you'd rather steer with your thumb, choose ⚙ → Laser → **Drag**. The zone then works like a trackpad, and the dot stays a moment after you lift so you can swipe again from where it is. The dot is drawn above full-screen slideshows on every Space, and the real cursor stays where it is. iOS asks once for motion access. If you refuse, drag your thumb in the zone instead. Switch the zone from **Laser** to **Pointer** to get a trackpad for the real pointer, say to click a link or start a video. The phone stays awake while Present is showing.
 
+## Known limitations
+
+- **Reconnecting.** The Remote reconnects a second after it loses the Host. If it seems stuck after the phone or the Mac slept, close the Home Screen app and open it again.
+- **Wi-Fi stutter.** With the Mac on Wi-Fi, the pointer can stall for about 100 ms a couple of times a second. The Mac's own Wi-Fi causes this, not the tailnet. A wired connection on the Mac avoids it.
+- **Networks that block Tailscale.** Some campus and office Wi-Fi blocks Tailscale, and the Remote can't reach the Mac. Put the iPhone on mobile data, or the Mac on a wired network, or both.
+- **Not included:** brightness control and a now-playing display. The Laser is tested over PowerPoint, Google Slides and Safari full screen, but not Keynote.
+
 ## Development
 
 ```sh
@@ -86,3 +95,7 @@ The layout:
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 
 `CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Pairing, Laser).
+
+## License
+
+MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
