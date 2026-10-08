@@ -97,6 +97,8 @@ button .icon { pointer-events: none; }
 .mic-dot[hidden] { display: none; }
 
 .pad.drag { border-color: var(--accent-line); }
+/* The dot grid, drawn under everything else on a trackpad. */
+.dots { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .strip .icon { width: 20px; height: 20px; }
 .strip.on { background: var(--surface-3); color: var(--text); }
 .gear {
@@ -300,6 +302,8 @@ button .icon { pointer-events: none; }
 .present .aim-switch button.on { background: var(--surface-3); color: var(--text); }
 .present[data-aim="laser"] .pointer-pad, .present[data-aim="pointer"] .zone { display: none; }
 .present .pointer-pad {
+  position: relative;
+  overflow: hidden;
   flex: 1;
   min-height: 0;
   background: var(--surface-1);
