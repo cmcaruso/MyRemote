@@ -47,6 +47,13 @@ export function createMicEncoder({ inRate, outRate = MIC.outRate, chunkMs = MIC.
   };
 }
 
+/**
+ * Whether a microphone track is the iPhone's own, at its bottom edge, rather than AirPods or another
+ * headset. iOS names it "iPhone Microphone", in every language with "iPhone" in it; a headset goes by its
+ * own name. No name yet counts as the phone's.
+ */
+export const isPhoneMic = (label) => !label || /\b(iphone|ipad)\b/i.test(label);
+
 /** Whether the socket is backed up enough that a new frame would only add delay. */
 export const shouldDrop = (bufferedAmount, rate, maxQueuedMs = MIC.maxQueuedMs) =>
   bufferedAmount > (rate * 2 * maxQueuedMs) / 1000;

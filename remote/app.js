@@ -1,7 +1,7 @@
 import { createFlip } from './flip.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
-import { createGate, createHowlDetector, createMicEncoder, placeNotch, shouldDrop } from './mic.js';
+import { createGate, createHowlDetector, createMicEncoder, isPhoneMic, placeNotch, shouldDrop } from './mic.js';
 import { createSender } from './sender.js';
 import { DEFAULTS, createScrollStrip, createTrackpad } from './trackpad.js';
 import { createVolumeSlider } from './volume-slider.js';
@@ -664,8 +664,10 @@ window.addEventListener('devicemotion', (e) => {
 
 /**
  * Held upside down, mic toward the mouth, the Remote turns itself round: iPhones with Face ID never rotate
- * a page upside down. Only in Presentation Mode and in portrait, from the tilt, once motion access is
- * granted; 'off' per device keeps it the right way up.
+ * a page upside down. Only while the Phone Mic records from the iPhone's own mic, the one reason to hold it
+ * that way: with AirPods, or the mic off, a phone held loosely with its top down mustn't turn the buttons
+ * round under the thumb. In Presentation Mode and portrait, from the tilt, once motion access is granted;
+ * 'off' per device keeps it the right way up.
  */
 let flipSetting = (() => { try { return localStorage.getItem('flip') === 'off' ? 'off' : 'auto'; } catch { return 'auto'; } })();
 const tilt = createFlip();
@@ -680,7 +682,8 @@ function setFlip(value) {
 }
 
 function renderFlip() {
-  flipped = flipSetting === 'auto' && app.dataset.mode === 'presentation' && portrait.matches && tilt.flipped;
+  flipped = flipSetting === 'auto' && mic?.onPhone === true && app.dataset.mode === 'presentation'
+    && portrait.matches && tilt.flipped;
   app.classList.toggle('flipped', flipped);
 }
 window.addEventListener('deviceorientation', (e) => {
@@ -710,6 +713,7 @@ function renderMic() {
   micButton.setAttribute('aria-pressed', String(mic !== null));
   micDot.hidden = mic === null;
   keepAwake(wantAwake());
+  renderFlip();
 }
 
 micButton.addEventListener('click', () => {
@@ -738,6 +742,9 @@ async function captureMic(m) {
       return;
     }
     m.stream = stream;
+    m.onPhone = isPhoneMic(stream.getAudioTracks()[0]?.label);
+    m.inputs = await audioInputs();
+    renderFlip();
     await m.module;
     if (mic !== m) return;
     const { context } = m;
@@ -851,6 +858,24 @@ function stopMic() {
   for (const track of m.stream?.getTracks() ?? []) track.stop();
   m.context.close().catch(() => {});
 }
+
+/** The microphones iOS offers now, as one comparable string. */
+async function audioInputs() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((d) => d.kind === 'audioinput').map((d) => d.deviceId).join(' ');
+  } catch {
+    return '';
+  }
+}
+
+// AirPods or a headset came or went: iOS moves the input, so take the mic again, from where it is now.
+navigator.mediaDevices?.addEventListener('devicechange', async () => {
+  const m = mic;
+  if (!m?.stream) return;
+  const inputs = await audioInputs();
+  if (mic === m && m.stream && inputs !== m.inputs) recaptureMic(m);
+});
 
 // Back from the background: iOS may have paused the audio or ended the track.
 document.addEventListener('visibilitychange', () => {

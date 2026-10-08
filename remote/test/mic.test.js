@@ -47,7 +47,12 @@ test('drops frames once the socket holds more than 100 ms', () => {
   assert.equal(shouldDrop(4801, 24000), true);
 });
 
-import { GUARD, HOWL, createGate, createHowlDetector, placeNotch } from '../mic.js';
+import { GUARD, HOWL, createGate, createHowlDetector, isPhoneMic, placeNotch } from '../mic.js';
+
+test('tells the iPhone’s own mic from AirPods and headsets', () => {
+  for (const label of ['iPhone Microphone', 'Microfono iPhone', 'iPad Microphone', '']) assert.equal(isPhoneMic(label), true, label);
+  for (const label of ['AirPods Pro di Camillo', 'AirPods', 'Headset Microphone', 'Bose QC']) assert.equal(isPhoneMic(label), false, label);
+});
 
 const RATE = 48000;
 const tone = (amplitude, n = 128) => Float32Array.from({ length: n }, (_, i) => amplitude * Math.sin(i / 5));
