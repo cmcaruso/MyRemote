@@ -91,6 +91,23 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .setting input[type=range] { width: 100%; accent-color: #0a84ff; }
 .sheet-buttons { display: flex; gap: 8px; margin-top: 12px; }
 .sheet-buttons button { flex: 1; height: 40px; border-radius: 10px; background: var(--panel-2); }
+.unpair { width: 100%; height: 40px; margin-top: 18px; border-radius: 10px; color: var(--bad); background: var(--panel-2); }
+
+/* Pairing: covers the console until the Host knows this Remote. */
+.pairing { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: var(--bg); }
+.pairing[hidden] { display: none; }
+.pairing form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 340px; text-align: center; }
+.pairing h1 { margin: 0; font-size: 24px; }
+.pairing p { margin: 0; color: var(--muted); line-height: 1.4; }
+.pairing .hint { color: #ffd60a; }
+.pairing input {
+  height: 64px; border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text); background: var(--surface);
+  font: 600 32px ui-monospace, Menlo, monospace; letter-spacing: .15em; text-align: center;
+}
+.pairing .error { min-height: 1.4em; color: var(--bad); }
+.pairing button { height: 50px; border-radius: 14px; background: #0a84ff; font-weight: 600; }
+.pairing button:disabled { opacity: .5; }
 
 .modes { grid-area: modes; display: flex; padding: 3px; background: var(--panel); border-radius: 11px; }
 .modes button { flex: 1; height: 36px; border-radius: 8px; font-size: 13px; color: var(--muted); }

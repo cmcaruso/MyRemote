@@ -41,6 +41,8 @@ for (const b of modeButtons) b.addEventListener('click', () => showMode(b.datase
 
 const conn = document.getElementById('conn');
 let sender = createSender({ readyState: 3, bufferedAmount: 0, send() {} });
+/** The Host closes the socket with this when the Remote isn't paired, or was just revoked. */
+const UNPAIRED = 4401;
 
 function connect() {
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
@@ -54,12 +56,77 @@ function connect() {
       renderVolume();
     }
   });
-  socket.addEventListener('close', () => {
+  socket.addEventListener('close', (e) => {
     conn.classList.remove('on');
-    setTimeout(connect, 1000);
+    if (e.code === UNPAIRED) showPairing(e.reason);
+    else if (pairing.hidden) setTimeout(connect, 1000);
   });
 }
 connect();
+
+// ---------- Pairing ----------
+
+const pairing = document.getElementById('pairing');
+const pairForm = document.getElementById('pair-form');
+const pairCode = document.getElementById('pair-code');
+const pairError = document.getElementById('pair-error');
+const pairButton = document.getElementById('pair-button');
+
+const PAIR_ERRORS = {
+  wrongCode: 'That’s not the code. Try again.',
+  tooManyTries: 'Too many wrong tries. Ask the Mac for a new code.',
+  noCode: 'No code is waiting. Choose Pair a Remote… on the Mac.',
+  notOnTailnet: 'The Remote isn’t reaching the Mac through Tailscale.',
+  otherOrigin: 'Open the Remote from its own address.',
+  otherLogin: 'This Remote paired under another Tailscale account. Pair it again.',
+};
+
+/** @param {string} [why] the Host's reason; only the ones pairing again won't fix are worth showing up front. */
+function showPairing(why) {
+  pairError.textContent = ['notOnTailnet', 'otherOrigin', 'otherLogin'].includes(why) ? PAIR_ERRORS[why] : '';
+  // A Home Screen app has its own cookies, so pairing in a Safari tab doesn't carry over.
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  document.getElementById('pair-hint').hidden = standalone;
+  pairing.hidden = false;
+}
+
+async function pair() {
+  const code = pairCode.value.replace(/\D/g, '');
+  if (code.length !== 6) return;
+  pairButton.disabled = true;
+  pairError.textContent = '';
+  try {
+    const response = await fetch('/pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok) {
+      pairing.hidden = true;
+      pairCode.value = '';
+      connect();
+    } else {
+      pairError.textContent = PAIR_ERRORS[body.error] ?? 'The Mac refused the code.';
+      pairCode.select();
+    }
+  } catch {
+    pairError.textContent = 'Can’t reach the Mac.';
+  } finally {
+    pairButton.disabled = false;
+  }
+}
+
+pairForm.addEventListener('submit', (e) => { e.preventDefault(); pair(); });
+// Pair as soon as the sixth digit is in.
+pairCode.addEventListener('input', () => { if (pairCode.value.replace(/\D/g, '').length === 6) pair(); });
+
+document.getElementById('unpair').addEventListener('click', async () => {
+  if (!confirm('Unpair this Remote? To use it again, you’ll need a new code from the Mac.')) return;
+  await fetch('/unpair', { method: 'POST' }).catch(() => {});
+  sheet.close();
+  showPairing();
+});
 
 // Send whatever backpressure held back, once per frame.
 (function drainEachFrame() {

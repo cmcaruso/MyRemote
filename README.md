@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: early. Trackpad and Media Modes work. Keyboard, Presentation and Pairing are being built, so until Pairing lands, anyone who can reach the Remote can control the Mac.
+Status: early. Trackpad and Media Modes work, and a Remote has to be paired before it can control the Mac. Keyboard and Presentation are being built.
 
 ## Requirements
 
@@ -42,6 +42,7 @@ The menu shows:
 - whether the Host is serving, and on which port;
 - whether `tailscale serve` reaches it. If it does, you get the Remote's address with **Copy Remote Address** (Universal Clipboard hands it to the iPhone). If it doesn't, you get the `tailscale serve --bg <port>` command to copy. If Funnel is on, the menu warns you: Funnel puts the Remote on the public internet. The Host reads this from Tailscale's CLI (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`, or `tailscale` in `/usr/local/bin` or `/opt/homebrew/bin`). Without the CLI, the Host still works, and the menu just says it can't check;
 - how many Remotes are connected;
+- **Pair a Remote…**, and the **Paired Remotes** you can revoke (see below);
 - the Accessibility grant, with a button to its settings if it's missing;
 - **Launch at Login**. The login item remembers where the app is. It stays on when `bundle.sh` rebuilds the app in place, but if you move the app, turn it off first and on again from the new place. macOS may ask you to approve it in System Settings → General → Login Items.
 
@@ -49,6 +50,19 @@ The menu shows:
 
 1. On the iPhone, open `https://<your-mac>.<your-tailnet>.ts.net` in Safari.
 2. Tap Share → **Add to Home Screen**, then open the Remote from its icon. Always use it from there, not from a Safari tab.
+
+### 4. Pair the Remote
+
+The Remote opens on **Pair with your Mac**. On the Mac, choose **Pair a Remote…** in the MyRemote menu: a window shows a 6-digit code for 2 minutes. Type it into the Remote, and the window confirms and closes. Pair inside the Home Screen app: it keeps its own cookies, so pairing in a Safari tab doesn't carry over.
+
+How Pairing protects the Mac:
+
+- Each paired Remote holds a random token in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie that lasts 400 days and renews whenever the Remote connects. The Host keeps only a hash of it, in `~/Library/Application Support/MyRemote/remotes.json`.
+- Every request must come through `tailscale serve` with a tailnet login (`Tailscale-User-Login`), the same login the Remote paired under. Funnel traffic has no login, so it's refused.
+- The WebSocket and the pairing request must come from a page the Host served (`Origin` matching `Host`), so a web page open on the Mac can't drive it.
+- A code works once, and five wrong tries kill it.
+
+**Paired Remotes** in the menu lists each Remote with when it paired and was last used. **Revoke** one, or **Revoke All**: it's disconnected at once and goes back to the pairing screen. On the Remote, ⚙ → **Unpair this Remote** does the same from the phone.
 
 ## Development
 
@@ -58,12 +72,12 @@ node --test 'remote/test/*.test.js'          # Remote logic
 swift run MyRemoteHost                       # run the Host unbundled, serving ./remote
 ```
 
-When unbundled, the Host uses your terminal app's Accessibility grant, so rebuilding needs no new grant.
+When unbundled, the Host uses your terminal app's Accessibility grant, so rebuilding needs no new grant. Pairing has no bypass, so the Remote only works through `tailscale serve`: opening `http://127.0.0.1:8484` in a browser shows the pairing screen and refuses the code.
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
-- `Sources/MyRemoteHost`: the menubar app. It serves `remote/` and the `/ws` WebSocket, and posts input with `CGEvent`.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, Pairing, reading `tailscale serve` status, menu wording). It's unit-tested and has no AppKit.
+- `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket and the `/pair` and `/unpair` requests, and posts input with `CGEvent`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 

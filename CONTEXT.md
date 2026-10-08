@@ -20,6 +20,14 @@ _Avoid_: tab, view, page
 The one-time step that authorizes a Remote to control a Host.
 _Avoid_: login, auth, registration
 
+**Pairing code**:
+The 6-digit code the Host shows for 2 minutes and the user types into the Remote to pair it; it works once.
+_Avoid_: PIN, password, OTP
+
+**Paired Remote**:
+A Remote the Host has paired and not revoked; it carries a token in a cookie and is listed in the menubar.
+_Avoid_: device, session, client
+
 **Laser**:
 A glowing dot drawn by the Host on its screen during Presentation mode; distinct from the real cursor.
 _Avoid_: pointer, cursor

@@ -7,9 +7,12 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird-websocket.git", from: "2.0.0"),
+        // Already pulled in by Hummingbird; named here because the Host uses their types directly.
+        .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
     ],
     targets: [
-        // Pure logic the Host runs: the wire protocol and pointer math. No AppKit, no I/O.
+        // Pure logic the Host runs: the wire protocol, pointer math and Pairing. No AppKit, no I/O.
         .target(name: "HostCore"),
         // The menubar app: serves the Remote, turns commands into CGEvents.
         .executableTarget(
@@ -18,6 +21,8 @@ let package = Package(
                 "HostCore",
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdWebSocket", package: "hummingbird-websocket"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+                .product(name: "NIOWebSocket", package: "swift-nio"),
             ]
         ),
         .testTarget(name: "HostCoreTests", dependencies: ["HostCore"]),

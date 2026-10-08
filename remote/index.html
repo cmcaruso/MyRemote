@@ -38,9 +38,20 @@
           <button type="button" id="reset">Reset</button>
           <button value="done">Done</button>
         </div>
+        <button type="button" class="unpair" id="unpair">Unpair this Remote</button>
       </form>
     </dialog>
   </main>
+  <section class="pairing" id="pairing" hidden>
+    <form id="pair-form">
+      <h1>Pair with your Mac</h1>
+      <p>On the Mac, choose <b>Pair a Remote…</b> in the MyRemote menu and type the code it shows.</p>
+      <p class="hint" id="pair-hint" hidden>Add the Remote to your Home Screen first, then pair there: Safari keeps its own pairing.</p>
+      <input id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" aria-label="Pairing code">
+      <p class="error" id="pair-error" role="alert"></p>
+      <button id="pair-button">Pair</button>
+    </form>
+  </section>
   <script type="module" src="app.js"></script>
 </body>
 </html>

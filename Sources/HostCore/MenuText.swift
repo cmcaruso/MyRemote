@@ -1,3 +1,5 @@
+import Foundation
+
 /// A line of status in the menu, and optionally a menu item under it that copies something useful.
 public struct MenuLine: Equatable, Sendable {
     public struct Copy: Equatable, Sendable {
@@ -27,7 +29,7 @@ public enum MenuText {
         case let .serving(url, funnel):
             let address = MenuLine("Remote at \(url)", copy: .init(label: "Copy Remote Address", text: url))
             guard funnel else { return [address] }
-            return [address, MenuLine("Funnel is on: anyone on the internet can reach the Remote",
+            return [address, MenuLine("Funnel is on: the Remote's address is public on the internet",
                                       copy: command("tailscale serve reset && \(serveCommand)"))]
         case .notServing:
             return [MenuLine("tailscale serve doesn't reach the Host", copy: command(serveCommand))]
@@ -46,5 +48,39 @@ public enum MenuText {
         case 1: "1 Remote connected"
         default: "\(count) Remotes connected"
         }
+    }
+
+    /// The Paired Remotes submenu's title.
+    public static func pairedRemotes(_ count: Int) -> String {
+        count == 0 ? "No paired Remotes" : "Paired Remotes (\(count))"
+    }
+
+    /// One row of the Paired Remotes submenu.
+    public static func pairedRemote(name: String, pairedAt: Date, lastSeen: Date, now: Date,
+                                    timeZone: TimeZone = .current) -> String {
+        "\(name) · paired \(day(pairedAt, timeZone)) · last used \(ago(lastSeen, now: now, timeZone: timeZone))"
+    }
+
+    /// Time left on the live Pairing code, as m:ss.
+    public static func countdown(until expires: Date, now: Date) -> String {
+        let seconds = max(0, Int(expires.timeIntervalSince(now).rounded(.up)))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private static func ago(_ date: Date, now: Date, timeZone: TimeZone) -> String {
+        let minutes = Int(now.timeIntervalSince(date) / 60)
+        switch minutes {
+        case ..<1: return "just now"
+        case ..<60: return "\(minutes) min ago"
+        case ..<(24 * 60): return "\(minutes / 60) h ago"
+        default: return day(date, timeZone)
+        }
+    }
+
+    /// "8 Oct": the menu is in English whatever the Mac's locale.
+    private static func day(_ date: Date, _ timeZone: TimeZone) -> String {
+        var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: Locale(identifier: "en_GB"), timeZone: timeZone)
+        style = style.day().month(.abbreviated)
+        return date.formatted(style)
     }
 }
