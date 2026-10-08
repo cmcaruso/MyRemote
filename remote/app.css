@@ -13,7 +13,7 @@
   --raised: linear-gradient(rgb(255 255 255 / .035), rgb(255 255 255 / 0)) var(--surface-2);
   --text: #f5f5f7;
   --muted: #8e8e93;
-  --accent: var(--accent);
+  --accent: #0a84ff;
   --accent-line: rgb(10 132 255 / .45);
   --ok: #30d158;
   --bad: #ff453a;
@@ -48,6 +48,10 @@ html, body {
 }
 button { font: inherit; color: inherit; border: 0; padding: 0; background: none; transition: transform .12s var(--ease), background-color .12s, color .12s; }
 output, .slider span { font-variant-numeric: tabular-nums; }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon.solid { fill: currentColor; }
+button .icon { pointer-events: none; }
 
 /* Size to the real web view: `fixed; inset: 0`, never lvh (iOS 27 Home Screen apps can be shorter than lvh). */
 .console {
@@ -93,12 +97,19 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 .mic-dot[hidden] { display: none; }
 
 .pad.drag { border-color: var(--accent-line); }
+.strip .icon { width: 20px; height: 20px; }
 .strip.on { background: var(--surface-3); color: var(--text); }
 .gear {
   position: absolute; left: 18px; bottom: 12px;
-  width: 36px; height: 36px; border-radius: 50%;
-  color: var(--muted); font-size: 18px;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--muted);
+  background: rgb(44 44 46 / .55);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: var(--highlight);
 }
+.gear .icon { width: 20px; height: 20px; }
+.gear:active { transform: scale(.92); color: var(--text); }
 
 .sheet {
   width: min(420px, calc(100vw - 32px));
@@ -140,8 +151,13 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 .pairing button:disabled { opacity: .5; }
 
 .modes { grid-area: modes; display: flex; padding: 3px; background: var(--raised); border: 1px solid var(--hairline); border-radius: 11px; box-shadow: var(--highlight); }
-.modes button { flex: 1; height: 36px; border-radius: 8px; font-size: 13px; color: var(--muted); }
-.modes button.on { background: var(--surface-3); color: var(--text); }
+.modes button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  height: 46px; border-radius: 8px; font-size: 10.5px; font-weight: 500; color: var(--muted);
+}
+.modes button .icon { width: 22px; height: 22px; }
+.modes button:active { transform: scale(.94); }
+.modes button.on { color: var(--accent); }
 
 .panel {
   grid-area: panel;
@@ -161,10 +177,12 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 /* Media Mode */
 .media { display: flex; flex-direction: column; gap: 14px; }
 .transport { display: flex; justify-content: center; align-items: center; gap: 18px; }
-.transport button { width: 64px; height: 64px; border-radius: 50%; background: var(--raised); font-size: 24px; }
-.transport .play { width: 84px; height: 84px; background: var(--text); color: #000; font-size: 30px; }
+.transport button { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--raised); }
+.transport button .icon { width: 24px; height: 24px; }
+.transport .play { width: 84px; height: 84px; background: var(--text); color: #000; }
+.transport .play .icon { width: 30px; height: 30px; }
 .volume { display: flex; align-items: center; gap: 6px; }
-.volume > button { width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--raised); font-size: 22px; }
+.volume > button { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 12px; background: var(--raised); }
 .volume > button.on { background: var(--bad); }
 .slider { position: relative; flex: 1; height: 48px; overflow: hidden; background: var(--raised); border-radius: 12px; touch-action: none; }
 .slider .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
@@ -222,12 +240,13 @@ output, .slider span { font-variant-numeric: tabular-nums; }
   user-select: text;
 }
 .keyrow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-.keyrow button { height: 42px; border-radius: 9px; background: var(--raised); font-size: 17px; }
+.keyrow button { display: grid; place-items: center; height: 42px; border-radius: 9px; background: var(--raised); font-size: 17px; }
+.keyrow button .icon { width: 20px; height: 20px; }
 .keyrow [data-key="esc"], .keyrow [data-key="tab"] { font-size: 14px; }
 .keyrow button.down { background: var(--surface-3); }
 .keyrow button.once { background: var(--accent); color: #fff; }
 .keyrow button.locked { background: var(--text); color: #000; }
-.keyrow .toggle { color: var(--muted); font-size: 22px; }
+.keyrow .toggle { color: var(--muted); }
 .console.typing .keyrow .toggle { color: var(--accent); }
 .palette { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .palette button { font-size: 13px; }
@@ -241,7 +260,7 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 .console.presenting .padarea { display: none; }
 .console.presenting .panel.filled { padding: 10px; border-radius: var(--corner) var(--corner) 14px 14px; }
 .console.presenting .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
-.console.presenting .modes button { height: 44px; }
+.console.presenting .modes button { height: 50px; }
 .present {
   height: 100%;
   display: grid;
@@ -251,7 +270,10 @@ output, .slider span { font-variant-numeric: tabular-nums; }
   grid-template-areas: "prev black" "next next" "zone zone";
 }
 .present button { border-radius: 16px; background: var(--raised); font-size: 17px; font-weight: 600; }
+.present .prev, .present .next { display: flex; align-items: center; justify-content: center; gap: 2px; }
 .present .prev { grid-area: prev; color: var(--muted); }
+.present .prev .icon { width: 20px; height: 20px; margin-left: -6px; }
+.present .next .icon { width: 34px; height: 34px; margin-right: -10px; stroke-width: 2.2; }
 .present .black { grid-area: black; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: var(--muted); }
 .present .black small { font-size: 11px; font-weight: 400; }
 .present .next { grid-area: next; font-size: 30px; background: var(--text); color: #000; }
@@ -267,8 +289,10 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 .present .aim { grid-area: zone; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .aim-bar { display: flex; flex: none; gap: 6px; }
 .aim-switch { display: flex; flex: 1; padding: 3px; background: var(--raised); border-radius: 11px; }
-.present .aim-gear { width: 36px; flex: none; border-radius: 11px; font-size: 17px; font-weight: 400; color: var(--muted); }
-.present .mic { flex: none; min-width: 64px; padding: 0 12px; border-radius: 11px; font-size: 13px; color: var(--muted); }
+.present .aim-gear { display: grid; place-items: center; width: 36px; flex: none; border-radius: 11px; color: var(--muted); }
+.present .aim-gear .icon { width: 18px; height: 18px; }
+.present .mic { display: flex; align-items: center; justify-content: center; gap: 4px; flex: none; min-width: 72px; padding: 0 12px; border-radius: 11px; font-size: 13px; color: var(--muted); }
+.present .mic .icon { width: 16px; height: 16px; }
 .present .mic.starting { color: var(--text); }
 .present .mic.live { background: var(--bad); color: #fff; }
 .present .mic.denied { color: var(--bad); }
@@ -309,7 +333,7 @@ output, .slider span { font-variant-numeric: tabular-nums; }
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */
 .console.full .panel { display: none; }
 .console.full .modes { padding: 4px 20px 6px; border-radius: 14px 14px var(--corner) var(--corner); }
-.console.full .modes button { height: 44px; }
+.console.full .modes button { height: 50px; }
 
 /* Landscape: the Mode bar becomes a vertical rail on the right, clear of the Dynamic Island. */
 @media (orientation: landscape) {
@@ -323,7 +347,9 @@ output, .slider span { font-variant-numeric: tabular-nums; }
   .pad { border-radius: var(--corner) 14px 14px var(--corner); }
   .strip, .panel { border-radius: 14px; }
   .modes, .console.full .modes { flex-direction: column; gap: 4px; padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }
-  .modes button, .console.full .modes button { height: auto; font-size: 11px; }
+  .modes button, .console.full .modes button { height: auto; }
+  .modes button span { display: none; }
+  .modes button .icon { width: 24px; height: 24px; }
   .console.presenting { grid-template-columns: minmax(0, 1fr) 64px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "panel modes"; }
   .console.presenting .panel.filled { border-radius: var(--corner) 14px 14px var(--corner); }
   .console.presenting .modes { padding: 14px 4px; border-radius: 14px var(--corner) var(--corner) 14px; }

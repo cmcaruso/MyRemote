@@ -129,3 +129,5 @@ The layout:
 ## License
 
 MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
+
+The Remote's icons come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT).
