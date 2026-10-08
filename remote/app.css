@@ -87,6 +87,11 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .sheet h2 { margin: 0 0 8px; font-size: 17px; }
 .setting { display: grid; grid-template-columns: 8em 1fr 3em; align-items: center; gap: 10px; min-height: 40px; }
 .setting label { color: var(--muted); }
+.sheet h3 { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.sheet h3:first-child { margin-top: 4px; }
+.setting .seg { grid-column: span 2; display: flex; padding: 3px; background: var(--panel-2); border-radius: 9px; }
+.setting .seg button { flex: 1; height: 32px; border-radius: 7px; color: var(--muted); }
+.setting .seg button.on { background: #48484e; color: var(--text); }
 .setting output { text-align: right; font: 13px ui-monospace, Menlo, monospace; }
 .setting input[type=range] { width: 100%; accent-color: #0a84ff; }
 .sheet-buttons { display: flex; gap: 8px; margin-top: 12px; }
@@ -230,7 +235,9 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
 .present .black > * { position: relative; }
 /* The aim area: a Laser | Pointer switch over the Laser zone or a trackpad for the real pointer. */
 .present .aim { grid-area: zone; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
-.aim-switch { display: flex; flex: none; padding: 3px; background: var(--panel); border-radius: 11px; }
+.aim-bar { display: flex; flex: none; gap: 6px; }
+.aim-switch { display: flex; flex: 1; padding: 3px; background: var(--panel); border-radius: 11px; }
+.present .aim-gear { width: 36px; flex: none; border-radius: 11px; font-size: 17px; font-weight: 400; color: var(--muted); }
 .present .aim-switch button { flex: 1; height: 30px; border-radius: 8px; background: none; font-size: 13px; font-weight: 600; color: var(--muted); }
 .present .aim-switch button.on { background: var(--panel-2); color: var(--text); }
 .present[data-aim="laser"] .pointer-pad, .present[data-aim="pointer"] .zone { display: none; }
@@ -255,7 +262,6 @@ button { font: inherit; color: inherit; border: 0; padding: 0; background: none;
   font-weight: 600;
   touch-action: none;
 }
-.present .zone.drag span::after { content: " · drag"; }
 .present .zone.on { background: #3a1210; border-style: solid; border-color: #ff453a; box-shadow: inset 0 0 30px rgb(255 69 58 / .35); }
 
 /* Trackpad Mode: no panel, the pad grows and the Mode bar takes the bottom corners. */

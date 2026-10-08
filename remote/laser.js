@@ -1,3 +1,5 @@
+import { DEFAULTS, pointerGain } from './trackpad.js';
+
 /**
  * The Laser's "air pointer": turns the phone's rotation into deltas for the dot on the Mac.
  *
@@ -11,7 +13,7 @@ export const LASER = Object.freeze({
   gain: 45, // points per degree turned
   deadzone: 1.5, // deg/s of rotation ignored, so a hand held still keeps the dot still
   steady: 8, // deg/s: slower rotation is damped (half gain here), so walking and swaying don't drift the dot
-  drag: 2.5, // points per touch pixel, when motion permission is refused
+  linger: 1500, // ms the dot stays after the thumb lifts when steering by drag, to swipe again from there
 });
 
 /**
@@ -50,4 +52,13 @@ export function airDelta(rotation, gravity, angle, dt, p = LASER) {
   const yaw = steady(dead(dot(rotation, up), p.deadzone), p.steady);
   const pitch = steady(dead(dot(rotation, right), p.deadzone), p.steady);
   return { dx: -yaw * p.gain * dt, dy: -pitch * p.gain * dt };
+}
+
+/**
+ * Steering by drag instead: a thumb movement of `dx`, `dy` px over `dtMs`, through the trackpad's own
+ * speed and acceleration curve (and the user's trackpad settings), so it feels like the trackpad.
+ */
+export function dragDelta(dx, dy, dtMs, params = {}) {
+  const g = pointerGain({ ...DEFAULTS, ...params }, Math.hypot(dx, dy) / Math.max(dtMs, 4));
+  return { dx: dx * g, dy: dy * g };
 }

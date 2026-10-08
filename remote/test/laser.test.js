@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LASER, airDelta, rotationVector } from '../laser.js';
+import { LASER, airDelta, dragDelta, rotationVector } from '../laser.js';
+import { DEFAULTS } from '../trackpad.js';
 
 const near = (actual, expected) => {
   assert.ok(Math.abs(actual.dx - expected.dx) < 1e-9 && Math.abs(actual.dy - expected.dy) < 1e-9,
@@ -65,4 +66,22 @@ test('scales with the time between samples', () => {
   const one = airDelta([0, 0, -20], FLAT, 0, 1 / 60, p);
   const two = airDelta([0, 0, -20], FLAT, 0, 2 / 60, p);
   assert.ok(Math.abs(two.dx - 2 * one.dx) < 1e-9);
+});
+
+test('steering by drag follows the trackpad’s curve: slow is precise, fast goes far', () => {
+  const slow = dragDelta(2, 0, 16); // 0.125 px/ms
+  const fast = dragDelta(30, -30, 16); // ~2.7 px/ms
+  assert.ok(Math.abs(slow.dx / 2 - DEFAULTS.sens * (1 + DEFAULTS.accel * 0.125)) < 1e-9);
+  assert.ok(fast.dx / 30 > 3 * (slow.dx / 2));
+  assert.equal(fast.dx, -fast.dy);
+});
+
+test('steering by drag uses the user’s trackpad settings', () => {
+  const base = dragDelta(5, 0, 16);
+  const quicker = dragDelta(5, 0, 16, { sens: DEFAULTS.sens * 2 });
+  assert.ok(Math.abs(quicker.dx - 2 * base.dx) < 1e-9);
+});
+
+test('a drag with no time between samples doesn’t blow up', () => {
+  assert.ok(Number.isFinite(dragDelta(3, 3, 0).dx));
 });
