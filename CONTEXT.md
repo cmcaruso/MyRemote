@@ -29,5 +29,5 @@ A Remote the Host has paired and not revoked; it carries a token in a cookie and
 _Avoid_: device, session, client
 
 **Laser**:
-A glowing dot drawn by the Host on its screen during Presentation mode; distinct from the real cursor.
+A glowing dot the Host draws on one display only while the user holds it in Presentation mode, steered by turning the phone; distinct from the real cursor, which it never moves.
 _Avoid_: pointer, cursor
