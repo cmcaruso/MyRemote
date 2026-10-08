@@ -1,5 +1,6 @@
 import { DOTS, createDotGrid } from './dotgrid.js';
 import { createFlip, turnFor, unturn } from './flip.js';
+import { gestureFoot, gestureRows } from './gestures.js';
 import { createKeyboard } from './keyboard.js';
 import { LASER, airDelta, dragDelta, rotationVector } from './laser.js';
 import { createGate, createHowlDetector, createMicEncoder, isPhoneMic, placeNotch, shouldDrop } from './mic.js';
@@ -79,6 +80,9 @@ function connect() {
     if (message.t === 'vol') {
       volumeSlider.host(message, performance.now());
       renderVolume();
+    } else if (message.t === 'tp') {
+      macTrackpad = message;
+      renderGestures();
     }
   });
   socket.addEventListener('close', (e) => {
@@ -92,6 +96,7 @@ connect();
 function setConnected(on) {
   conn.classList.toggle('on', on);
   for (const layer of dotLayers) layer.render(); // the dots dim while the Host is away
+  renderGestures(); // and so do the Gestures
 }
 
 // ---------- Pairing ----------
@@ -272,10 +277,38 @@ function renderSettings() {
   toggle(trackpad, 'Momentum', params.momentum, (on) => { params.momentum = on; saveParams(); });
   toggle(trackpad, 'Pad effect', padEffect === 'on', (on) => setPadEffect(on ? 'on' : 'off'));
 
+  gestures = section('Gestures', '');
+  renderGestures();
+
   const presenting = section('Present', 'Upside down turns the Remote round when you hold the phone mic first while the Phone Mic is on. Echo guard keeps a room’s speakers from feeding back into the Phone Mic.');
   segmented(presenting, 'Laser', [['motion', 'Motion'], ['drag', 'Drag']], steer, setSteer);
   segmented(presenting, 'Upside down', [['auto', 'Auto'], ['off', 'Off']], flipSetting, setFlip);
   segmented(presenting, 'Echo guard', [['on', 'On'], ['off', 'Off']], guard, setGuard);
+}
+
+/** The Mac trackpad settings the Host last pushed, kept for this page load; null until the first. */
+let macTrackpad = null;
+/** The Settings sheet's Gestures group, refilled in place when the Host pushes or the connection changes. */
+let gestures = null;
+
+/** The Gestures section: read-only, the Mac's values, dimmed while the Host is away. */
+function renderGestures() {
+  if (!gestures) return;
+  const rows = gestureRows(macTrackpad);
+  gestures.replaceChildren(...rows.map(([label, value]) => {
+    const el = document.createElement('div');
+    el.className = 'row';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const detail = document.createElement('span');
+    detail.className = 'detail';
+    detail.textContent = value;
+    el.append(name, detail);
+    return el;
+  }));
+  gestures.hidden = rows.length === 0;
+  gestures.classList.toggle('away', !conn.classList.contains('on'));
+  gestures.nextElementSibling.textContent = gestureFoot(macTrackpad);
 }
 
 function openSettings() {

@@ -16,6 +16,14 @@ _Avoid_: client, controller, phone app
 One of the Remote's screens: Trackpad, Keyboard, Media, or Presentation.
 _Avoid_: tab, view, page
 
+**Gesture**:
+A multi-finger motion on the Remote's trackpad that the Host turns into what the Mac's own trackpad would do: pinch, rotate, smart zoom, the swipes, look up or three-finger drag.
+_Avoid_: shortcut, action
+
+**Mac trackpad settings**:
+The Mac's own choices of which Gestures are on and how many fingers each takes; the Remote follows them rather than keeping its own. Only the Gesture settings: tap to click, secondary click and scroll direction stay the Remote's, since the phone has no button to press.
+_Avoid_: prefs, config
+
 **Pairing**:
 The one-time step that authorizes a Remote to control a Host.
 _Avoid_: login, auth, registration
