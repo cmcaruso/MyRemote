@@ -16,8 +16,10 @@ final class Injector {
     private var switcher = AppSwitcher()
     /// Lets go of ⌘ once the App switcher's taps stop.
     private var switcherRelease: Task<Void, Never>?
+    private var gestures: Gestures
 
-    init() {
+    init(followsFingers: Bool) {
+        gestures = Gestures(followsFingers: followsFingers)
         // Don't freeze the Mac's own trackpad after each posted event.
         source?.localEventsSuppressionInterval = 0
     }
@@ -43,6 +45,7 @@ final class Injector {
             startMomentum()
         case .touchDown:
             stopMomentum()
+            gestures.cancel().forEach(post)
         case let .mediaKey(key):
             postMediaKey(key, down: true)
             postMediaKey(key, down: false)
@@ -59,6 +62,8 @@ final class Injector {
         case .appSwitcher:
             switcher.tap(at: Self.uptime()).forEach(post)
             releaseSwitcherWhenIdle()
+        case .gesture, .gestureEnd, .gestureAction:
+            gestures.apply(command).forEach(post)
         }
     }
 
@@ -66,6 +71,7 @@ final class Injector {
     func remoteLeft() {
         release()
         stopMomentum()
+        gestures.cancel().forEach(post)
         switcher.releaseNow().forEach(post)
     }
 
@@ -173,6 +179,29 @@ final class Injector {
         event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Double(scroll.dx))
         event.setIntegerValueField(.scrollWheelEventScrollPhase, value: scroll.phase.rawValue)
         event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: scroll.momentum.rawValue)
+        event.post(tap: .cghidEventTap)
+    }
+
+    /// Posts a gesture event the way the trackpad's arrive: type 29 (gesture) with its IOHID subtype,
+    /// value and phase in fields set by number, which `CGEventType` and `CGEventField` don't name
+    /// (docs/adr/0001). It goes to the window under the pointer, like a scroll.
+    private func post(_ gesture: GestureEvent) {
+        guard let event = CGEvent(source: source) else { return }
+        event.type = unsafeBitCast(UInt32(29), to: CGEventType.self)
+        let field = { (n: UInt32) in unsafeBitCast(n, to: CGEventField.self) }
+        let subtype: Int64
+        switch gesture.kind {
+        case let .magnify(delta):
+            subtype = 8 // kIOHIDEventTypeZoom
+            event.setDoubleValueField(field(113), value: delta)
+        case let .rotate(degrees):
+            subtype = 5 // kIOHIDEventTypeRotation
+            event.setDoubleValueField(field(114), value: degrees)
+        case .smartZoom:
+            subtype = 22 // kIOHIDEventTypeZoomToggle
+        }
+        event.setIntegerValueField(field(110), value: subtype)
+        event.setIntegerValueField(field(132), value: gesture.phase.rawValue)
         event.post(tap: .cghidEventTap)
     }
 

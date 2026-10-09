@@ -82,6 +82,7 @@ function connect() {
       renderVolume();
     } else if (message.t === 'tp') {
       macTrackpad = message;
+      trackpad.follow(macTrackpad);
       renderGestures();
     }
   });
@@ -191,6 +192,7 @@ function dispatch(commands) {
   for (const c of commands) {
     if (c.t === 'm') sender.move(c.dx, c.dy);
     else if (c.t === 's') sender.scroll(c.dx, c.dy);
+    else if (c.t === 'g') sender.gesture(c.g, c.d);
     else sender.send(c);
   }
 }
@@ -339,6 +341,10 @@ function setPadEffect(value) {
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const DOT_REST = [235, 235, 245];
 const DOT_LIT = [10, 132, 255]; // --accent
+/** Lit dots take this colour while an app Gesture (pinch, rotate, smart zoom) is on. */
+const DOT_APP = [191, 90, 242];
+/** What the pad says when a Gesture starts. */
+const GESTURE_LABELS = { pinch: 'Zoom', rotate: 'Rotate', smartZoom: 'Smart zoom' };
 /** Every surface with a dot grid. */
 const dotLayers = [];
 
@@ -354,6 +360,11 @@ function createDotLayer(el) {
   const grid = createDotGrid();
   let width = 0, height = 0, running = false, last = 0;
   let centre = null; // where the fingers were last, for a click's ring
+  let tint = null; // the lit dots' colour while a Gesture is on; null for the pointer's
+  const label = document.createElement('span');
+  label.className = 'gesture-label';
+  el.append(label);
+  let labelOff = null;
   const live = () => padEffect === 'on' && !reduceMotion.matches;
 
   function draw() {
@@ -361,7 +372,7 @@ function createDotLayer(el) {
     if (padEffect !== 'on') return;
     const online = conn.classList.contains('on');
     const dim = online ? 1 : 0.35;
-    const lit = online ? DOT_LIT : DOT_REST;
+    const lit = online ? tint ?? DOT_LIT : DOT_REST;
     const circle = (x, y, r) => { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 2 * Math.PI); };
     // Dots at rest in one path, then the moving and lit ones one by one.
     ctx.fillStyle = `rgba(${DOT_REST},${DOTS.idle * dim})`;
@@ -410,10 +421,26 @@ function createDotLayer(el) {
     draw();
   }).observe(el);
 
+  /** Flashes a Gesture's name in the pad. */
+  function say(text) {
+    label.textContent = text;
+    label.classList.add('on');
+    clearTimeout(labelOff);
+    labelOff = setTimeout(() => label.classList.remove('on'), 900);
+  }
+
   const layer = {
     render,
     /** Takes a touch event on the surface, and the commands it made: a click sends a ring out. */
     feed(e, commands) {
+      // A new touch starts with the pointer's colour; a Gesture tints the dots and says its name.
+      if (e.type === 'touchstart' && e.targetTouches.length === 1) tint = null;
+      for (const c of commands) {
+        const name = c.t === 'g' ? c.g : c.t === 'ga' ? c.a : null;
+        if (!name || (c.t === 'g' && tint)) continue;
+        tint = DOT_APP;
+        say(GESTURE_LABELS[name] ?? name);
+      }
       if (!live()) return;
       // In the surface's own pixels, which turn round with the console when it's upside down.
       const box = el.getBoundingClientRect();
@@ -422,7 +449,7 @@ function createDotLayer(el) {
         centre = { x: fingers.reduce((sum, f) => sum + f.x, 0) / fingers.length, y: fingers.reduce((sum, f) => sum + f.y, 0) / fingers.length };
       }
       grid.touches(fingers);
-      if (centre && commands.some((c) => c.t === 'c')) grid.tap(centre.x, centre.y);
+      if (centre && commands.some((c) => c.t === 'c' || c.t === 'ga')) grid.tap(centre.x, centre.y);
       render();
     },
   };
@@ -435,10 +462,13 @@ reduceMotion.addEventListener('change', () => { for (const layer of dotLayers) l
 
 const pad = document.getElementById('pad');
 const strip = document.getElementById('strip');
-let trackpad, scrollStrip;
+let trackpad, pointerTrackpad, scrollStrip;
 
 function rebuildGestures() {
   trackpad = createTrackpad(params);
+  trackpad.follow(macTrackpad);
+  // The Present pointer pad stays a plain trackpad: no Gestures.
+  pointerTrackpad = createTrackpad(params);
   scrollStrip = createScrollStrip(params);
 }
 rebuildGestures();
@@ -592,7 +622,28 @@ function resetTyping() {
   renderKeys();
 }
 
-field.addEventListener('input', () => {
+// iOS turns three-finger swipes and pinches into undo, redo and paste in the focused field, so a
+// Gesture on the pad while typing would edit the Mac's text. Those edits are dropped while three or
+// more fingers are down, and just after.
+let manyFingersAt = -Infinity;
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+  document.addEventListener(type, (e) => {
+    const lifted = type === 'touchend' || type === 'touchcancel' ? e.changedTouches.length : 0;
+    if (e.touches.length + lifted >= 3) manyFingersAt = performance.now();
+  }, { capture: true, passive: true });
+}
+const MULTI_FINGER_EDITS = new Set(['historyUndo', 'historyRedo', 'insertFromPaste']);
+const fromManyFingers = (e) => MULTI_FINGER_EDITS.has(e.inputType) && performance.now() - manyFingersAt < 600;
+field.addEventListener('beforeinput', (e) => {
+  if (fromManyFingers(e)) e.preventDefault();
+});
+
+field.addEventListener('input', (e) => {
+  // In case iOS didn't let the edit be cancelled: put the field back, send nothing.
+  if (fromManyFingers(e)) {
+    syncField();
+    return;
+  }
   dispatch(keyboard.input(field.value));
   syncField();
   renderKeys();
@@ -713,7 +764,7 @@ function setAim(aim) {
 for (const b of present.querySelectorAll('[data-aim]')) b.addEventListener('click', () => setAim(b.dataset.aim));
 setAim((() => { try { return localStorage.getItem('aim') === 'pointer' ? 'pointer' : 'laser'; } catch { return 'laser'; } })());
 
-listen(pointerPad, () => trackpad, (commands) => {
+listen(pointerPad, () => pointerTrackpad, (commands) => {
   for (const c of commands) {
     if (c.t === 'd') pointerPad.classList.add('drag');
     if (c.t === 'u') pointerPad.classList.remove('drag');

@@ -144,3 +144,103 @@ test('the scroll strip scrolls vertically with one finger and flicks into moment
   same(strip.move([finger(9, 80)], 32), [{ t: 's', dx: 0, dy: -15 }]);
   same(strip.end([], 40), [{ t: 'se', vx: 0, vy: -1.875 }]);
 });
+
+// ---------- Gestures, following the Mac trackpad settings ----------
+
+/** A new Mac's settings, as the Host pushes them. */
+const mac = (fields = {}) => ({
+  t: 'tp', pinch: true, rotate: true, smartZoom: true, pages: '2', spaces: 3, missionControl: 3,
+  appExpose: 0, showDesktop: true, apps: true, notificationCenter: true, lookUp: true,
+  threeFingerDrag: false, followsFingers: true, ...fields,
+});
+/** Two fingers `r` px either side of (150, 100), turned `deg` degrees clockwise on screen, moved by `dx`. */
+const pair = (r, deg = 0, dx = 0) => {
+  const a = (deg * Math.PI) / 180;
+  return [finger(150 + dx - r * Math.cos(a), 100 - r * Math.sin(a), 1), finger(150 + dx + r * Math.cos(a), 100 + r * Math.sin(a), 2)];
+};
+/** A pad following `tp`, with two fingers down at 0 and 5 ms. */
+function twoDown(tp = mac()) {
+  const pad = createTrackpad();
+  pad.follow(tp);
+  pad.start([pair(50)[0]], 0);
+  pad.start(pair(50), 5);
+  return pad;
+}
+
+test('a pinch waits for the fingers to settle, then sends magnification deltas', () => {
+  const pad = twoDown();
+  same(pad.move(pair(60), 30), []); // before the 60 ms settle
+  same(pad.move(pair(60), 70), []); // decided here; the deltas start from this spread
+  same(pad.move(pair(72), 90), [{ t: 'g', g: 'pinch', d: 0.2 }]);
+  same(pad.move(pair(72), 100), []); // no change, no frame
+});
+
+test('a rotate sends degrees, counter-clockwise positive', () => {
+  const pad = twoDown();
+  same(pad.move(pair(50, 20), 70), []);
+  same(pad.move(pair(50, 30), 90), [{ t: 'g', g: 'rotate', d: -10 }]);
+});
+
+test('a Gesture holds until every finger is up, then ends', () => {
+  const pad = twoDown();
+  pad.move(pair(60), 70);
+  pad.move(pair(66), 80);
+  same(pad.end([pair(66)[0]], 100), []);
+  same(pad.move([finger(10, 10, 1)], 110), []); // the finger left behind moves nothing
+  same(pad.end([], 120), [{ t: 'ge', g: 'pinch', ok: true }]);
+  // The next touch starts afresh.
+  same(pad.start([finger(0, 0)], 400), [{ t: 'x' }]);
+});
+
+test('with the Mac trackpad settings, two fingers still scroll, keeping the travel made while settling', () => {
+  const pad = twoDown();
+  same(pad.move(pair(50, 0, 20), 30), []);
+  same(pad.move(pair(50, 0, 25), 70), [{ t: 's', dx: 37.5, dy: 0 }]);
+  same(pad.move(pair(50, 0, 29), 80), [{ t: 's', dx: 6, dy: 0 }]);
+});
+
+test('a two-finger tap right-clicks at once, and a second one soon after smart-zooms', () => {
+  const pad = twoDown();
+  same(pad.end([pair(50)[1]], 60), [{ t: 'c', b: 1, n: 1 }]);
+  same(pad.end([], 65), []);
+  pad.start([pair(50)[0]], 200);
+  pad.start(pair(50), 205);
+  same(pad.end([pair(50)[1]], 250), [{ t: 'ga', a: 'smartZoom' }]);
+  pad.end([], 255);
+  // The double-tap is over: the next one right-clicks again.
+  pad.start(pair(50), 400);
+  same(pad.end([], 450), [{ t: 'c', b: 1, n: 1 }]);
+});
+
+test('a second two-finger tap right-clicks again with smart zoom off, or too late', () => {
+  const pad = twoDown(mac({ smartZoom: false }));
+  pad.end([], 60);
+  pad.start(pair(50), 200);
+  same(pad.end([], 250), [{ t: 'c', b: 1, n: 1 }]);
+
+  const late = twoDown();
+  late.end([], 60);
+  late.start(pair(50), 400);
+  same(late.end([], 450), [{ t: 'c', b: 1, n: 1 }]);
+});
+
+test('spreading the fingers sends no Gesture when the Mac has pinch off', () => {
+  const pad = twoDown(mac({ pinch: false }));
+  same(pad.move(pair(60), 70), []);
+  same(pad.move(pair(72), 90), []);
+});
+
+test('three fingers send nothing yet with the Mac trackpad settings', () => {
+  const pad = twoDown();
+  same(pad.start([...pair(50), finger(150, 200, 3)], 10), []);
+  same(pad.move([...pair(50, 0, 40), finger(190, 200, 3)], 100), []);
+  same(pad.end(pair(50, 0, 40), 120), []);
+  same(pad.end([], 130), []);
+});
+
+test('without the Mac trackpad settings, a pinch is just two fingers, as in v1', () => {
+  const pad = createTrackpad();
+  pad.start(pair(50), 0);
+  same(pad.move(pair(60), 70), []);
+  same(pad.end([], 100), [{ t: 'c', b: 1, n: 1 }]);
+});

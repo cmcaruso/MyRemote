@@ -17,6 +17,9 @@ import Foundation
 /// - `{"t":"as"}`: one tap of the App switcher (⌘ held for the Remote, Tab pressed).
 /// - `{"t":"ls"}` / `{"t":"le"}`: the Laser zone is held / released: show / hide the Laser.
 /// - `{"t":"l","dx":3,"dy":-1}`: move the Laser by a relative delta in points, already scaled by the Remote.
+/// - `{"t":"g","g":"pinch","d":0.04}`: a continuous `Gesture` moved by `d`; the first frame after an end begins it.
+/// - `{"t":"ge","g":"pinch","ok":true}`: the fingers lifted; `ok` says whether the Gesture completes.
+/// - `{"t":"ga","a":"smartZoom"}`: a one-shot `GestureAction`.
 public enum Command: Equatable, Sendable {
     case move(dx: Double, dy: Double)
     case click(Button, count: Int)
@@ -34,10 +37,25 @@ public enum Command: Equatable, Sendable {
     case laserStart
     case laserMove(dx: Double, dy: Double)
     case laserEnd
+    case gesture(Gesture, delta: Double)
+    case gestureEnd(Gesture, completes: Bool)
+    case gestureAction(GestureAction)
 
     public enum Button: Sendable {
         case left, right
     }
+}
+
+/// A continuous Gesture the Remote recognised, named on the wire. Units of its deltas: pinch, the change
+/// in magnification (0.04 = 4 % larger); rotate, degrees counter-clockwise; the Dock Gestures, progress,
+/// where 1.0 = half the pad of travel (`spaces` signed, negative = left).
+public enum Gesture: String, Sendable {
+    case pinch, rotate, missionControl, appExpose, spaces, showDesktop, apps
+}
+
+/// A one-shot Gesture.
+public enum GestureAction: String, Sendable {
+    case smartZoom, lookUp, notificationCenter, pageBack, pageForward
 }
 
 extension Command {
@@ -97,6 +115,15 @@ extension Command {
             self = .laserMove(dx: dx, dy: dy)
         case "le":
             self = .laserEnd
+        case "g":
+            guard let g = frame.g, let gesture = Gesture(rawValue: g), let d = frame.d else { return nil }
+            self = .gesture(gesture, delta: d)
+        case "ge":
+            guard let g = frame.g, let gesture = Gesture(rawValue: g), let ok = frame.ok else { return nil }
+            self = .gestureEnd(gesture, completes: ok)
+        case "ga":
+            guard let a = frame.a, let action = GestureAction(rawValue: a) else { return nil }
+            self = .gestureAction(action)
         default:
             return nil
         }
@@ -117,4 +144,8 @@ private struct Frame: Decodable {
     var s: String?
     var c: String?
     var m: [String]?
+    var g: String?
+    var d: Double?
+    var ok: Bool?
+    var a: String?
 }
