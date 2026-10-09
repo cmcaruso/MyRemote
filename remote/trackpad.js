@@ -7,7 +7,7 @@
  * wire format.
  */
 
-import { GESTURE, classifyTwo, pinchDelta, rotateDelta, shape } from './gestures.js';
+import { GESTURE, classifyMany, classifyTwo, completes, dockProgress, pinchDelta, rotateDelta, shape } from './gestures.js';
 
 /** Gesture timings and the acceleration curve; v1 defaults from the trackpad-feel prototype. */
 export const DEFAULTS = Object.freeze({
@@ -62,7 +62,8 @@ export function createTrackpad(params = {}) {
 
   /**
    * idle | one (one finger) | two (two fingers, undecided) | scroll | pinch | rotate | many (three or more
-   * fingers) | done (wait for all fingers up). Pinch, rotate and many come only with the Mac's settings.
+   * fingers, undecided) | dock (a Dock Gesture) | done (wait for all fingers up). Pinch, rotate, many and
+   * dock come only with the Mac's settings.
    */
   let mode = 'idle';
   let start = null; // first finger at touch-down: { x, y, t }
@@ -77,11 +78,32 @@ export function createTrackpad(params = {}) {
   let mac = null; // the Mac trackpad settings followed; until they come, v1's two-finger gestures only
   let base = null; // the two fingers' shape when they landed, or when the Gesture last moved
   let lastTwoTap = null; // end of the last two-finger tap, for smart zoom
+  let countAt = 0; // when the finger count last changed, while three or more are undecided
+  let dock = null; // the Dock Gesture under way: { g, last (shape), progress, spread (where a pinch began) }
+  const dockFlick = createFlick({ momentum: true }); // its progress per ms, for a flick
+  let size = { width: 320, height: 400 }; // the pad's, in px: a swipe's progress is relative to it
+
+  /** The Dock Gesture's progress since the fingers' last shape. */
+  function followDock(touches, t) {
+    const now = shape(touches);
+    // A finger lifted or came back: carry on from the new shape.
+    const d = now.n === dock.last.n ? dockProgress(dock.g, dock.last, now, size, dock.spread) : 0;
+    dock.last = now;
+    if (d === 0) return [];
+    dock.progress += d;
+    dockFlick.add(t, d, 0);
+    return [{ t: 'g', g: dock.g, d }];
+  }
 
   return {
     /** Follows the Mac trackpad settings the Host pushed ({t:'tp',…}), or v1's gestures with null. */
     follow(tp) {
       mac = tp;
+    },
+
+    /** The pad's size in px. */
+    resize(width, height) {
+      if (width > 0 && height > 0) size = { width, height };
     },
 
     /** @param {Touch[]} touches all touches now down @param {number} t event time, ms */
@@ -95,8 +117,11 @@ export function createTrackpad(params = {}) {
         moved = false;
         dragging = false;
         secondTap = lastTap !== null && t - lastTap.t < p.dblMs && Math.hypot(f.x - lastTap.x, f.y - lastTap.y) < 60;
-      } else if (mac && touches.length >= 3 && (mode === 'idle' || mode === 'two' || (mode === 'one' && !dragging))) {
+      } else if (mac && touches.length >= 3 && (mode === 'idle' || mode === 'two' || mode === 'many' || (mode === 'one' && !dragging))) {
+        // Measure again from here, once the fingers settle.
         mode = 'many';
+        countAt = t;
+        base = shape(touches);
       } else if (touches.length >= 2 && (mode === 'idle' || (mode === 'one' && !dragging))) {
         mode = 'two';
         twoStart = t;
@@ -138,6 +163,18 @@ export function createTrackpad(params = {}) {
           out.push({ t: 'm', dx: dx * g, dy: dy * g });
         }
         last = { x: f.x, y: f.y, t };
+      } else if (mode === 'many' && touches.length >= 3) {
+        if (t - countAt < GESTURE.settleMs) return out;
+        const now = shape(touches);
+        const g = classifyMany(base, now, mac);
+        if (g) {
+          mode = 'dock';
+          // From where the fingers settled, so the Dock catches up with the travel that decided it.
+          dock = { g, last: base, progress: 0, spread: base.spread };
+          return followDock(touches, t);
+        }
+      } else if (mode === 'dock' && touches.length > 0) {
+        return followDock(touches, t);
       } else if ((mode === 'pinch' || mode === 'rotate') && touches.length >= 2) {
         const now = shape(touches);
         // A finger lifted or came back: carry on from the new shape.
@@ -196,6 +233,15 @@ export function createTrackpad(params = {}) {
       } else if (mode === 'scroll') {
         out.push({ t: 'se', ...flick.release(t) });
         mode = left ? 'done' : 'idle';
+      } else if (mode === 'dock') {
+        if (left === 0) {
+          out.push({ t: 'ge', g: dock.g, ok: completes(dock.g, dock.progress, dockFlick.release(t).vx) });
+          dock = null;
+          mode = 'idle';
+        }
+      } else if (mode === 'many' && left > 0) {
+        countAt = t;
+        base = shape(touches);
       } else if ((mode === 'done' || mode === 'many') && left === 0) {
         mode = 'idle';
       }

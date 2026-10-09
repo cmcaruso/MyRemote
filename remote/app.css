@@ -115,7 +115,7 @@ button .icon { pointer-events: none; }
 /* A Gesture's name, flashed in the pad as it starts. */
 .gesture-label {
   position: absolute; top: 14px; left: 50%; transform: translate(-50%, -4px); pointer-events: none;
-  padding: 3px 10px; border-radius: 10px; background: rgb(191 90 242 / .18); color: #d9a6f7;
+  padding: 3px 10px; border-radius: 10px; background: rgb(var(--tint, 191 90 242) / .2); color: rgb(var(--tint, 191 90 242));
   font-size: 12px; font-weight: 600; letter-spacing: .02em; opacity: 0; transition: opacity .25s, transform .25s;
 }
 .gesture-label.on { opacity: 1; transform: translate(-50%, 0); }

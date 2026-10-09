@@ -59,6 +59,10 @@ export function gestureFoot(tp) {
 export const GESTURE = Object.freeze({
   settleMs: 60, // after the finger count last changed, before deciding
   dblMs: 300, // window for the second two-finger tap of a smart zoom
+  commitPx: 30, // px the fingers travel before a swipe is decided
+  pinchRatio: 0.2, // change in spread that makes a 4–5 finger pinch, and completes it
+  complete: 0.25, // progress at release that completes a swipe
+  flick: 0.002, // progress per ms at release, toward the Gesture, that completes it however far it got
 });
 
 const deg = (r) => (r * 180) / Math.PI;
@@ -102,3 +106,58 @@ export const pinchDelta = (prev, now) => (prev.spread > 0 ? now.spread / prev.sp
 
 /** A rotate's delta in degrees, counter-clockwise positive (the page's y points down). */
 export const rotateDelta = (prev, now) => -deg(wrap(now.angle - prev.angle));
+
+/** The Dock Gestures that are pinches; the others are swipes. */
+const PINCHES = new Set(['showDesktop', 'apps']);
+
+/**
+ * Which Dock Gesture three to five fingers are doing since `base`, following the Mac trackpad settings,
+ * or null while undecided or when the Mac has it off. Four or five fingers pinching in or spreading by
+ * 20 % are Apps or Show Desktop; otherwise, once they travel 30 px, a swipe for that many fingers (five
+ * swipe as four).
+ * @param {ReturnType<typeof shape>} base @param {ReturnType<typeof shape>} now @param {object} tp
+ */
+export function classifyMany(base, now, tp) {
+  const s = effective(tp);
+  const dx = now.c.x - base.c.x, dy = now.c.y - base.c.y, travel = Math.hypot(dx, dy);
+  const ratio = now.spread / base.spread;
+  if (now.n >= 4 && Math.abs(now.spread - base.spread) >= travel / 2) {
+    if (ratio <= 1 - GESTURE.pinchRatio) return s.apps ? 'apps' : null;
+    if (ratio >= 1 + GESTURE.pinchRatio) return s.showDesktop ? 'showDesktop' : null;
+  }
+  if (travel < GESTURE.commitPx) return null;
+  const fingers = Math.min(now.n, 4);
+  if (Math.abs(dx) > Math.abs(dy)) return s.spaces === fingers ? 'spaces' : null;
+  if (dy < 0) return s.missionControl === fingers ? 'missionControl' : null;
+  return s.appExpose === fingers ? 'appExpose' : null;
+}
+
+/**
+ * How far a Dock Gesture moved between two shapes, in progress: 1.0 is all the way, half the pad of travel
+ * for a swipe, half or one and a half times the starting spread for a pinch. Spaces is signed, fingers
+ * to the right positive.
+ * @param {string} g @param {ReturnType<typeof shape>} from @param {ReturnType<typeof shape>} to
+ * @param {{ width: number, height: number }} pad @param {number} spread the spread the pinch started from
+ */
+export function dockProgress(g, from, to, pad, spread) {
+  switch (g) {
+    case 'missionControl': return (from.c.y - to.c.y) / (pad.height / 2);
+    case 'appExpose': return (to.c.y - from.c.y) / (pad.height / 2);
+    case 'spaces': return (to.c.x - from.c.x) / (pad.width / 2);
+    case 'showDesktop': return (to.spread - from.spread) / (spread / 2);
+    case 'apps': return (from.spread - to.spread) / (spread / 2);
+    default: return 0;
+  }
+}
+
+/**
+ * Whether a Dock Gesture released at `progress`, moving at `speed` progress per ms, completes: a quarter
+ * of the way for a swipe, a 20 % change in spread for a pinch, or a flick toward it. Spaces counts
+ * either way.
+ */
+export function completes(g, progress, speed) {
+  const sign = g === 'spaces' ? Math.sign(progress) : 1;
+  const p = progress * sign, v = speed * sign;
+  if (p <= 0) return false;
+  return p >= (PINCHES.has(g) ? GESTURE.pinchRatio * 2 : GESTURE.complete) || v >= GESTURE.flick;
+}

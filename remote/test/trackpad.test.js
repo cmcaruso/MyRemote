@@ -230,12 +230,97 @@ test('spreading the fingers sends no Gesture when the Mac has pinch off', () => 
   same(pad.move(pair(72), 90), []);
 });
 
-test('three fingers send nothing yet with the Mac trackpad settings', () => {
-  const pad = twoDown();
-  same(pad.start([...pair(50), finger(150, 200, 3)], 10), []);
-  same(pad.move([...pair(50, 0, 40), finger(190, 200, 3)], 100), []);
-  same(pad.end(pair(50, 0, 40), 120), []);
-  same(pad.end([], 130), []);
+/** Three fingers in a row at (200, 200), moved by `dx`, `dy`. */
+const trio = (dx = 0, dy = 0) => [finger(160 + dx, 200 + dy, 1), finger(200 + dx, 190 + dy, 2), finger(240 + dx, 200 + dy, 3)];
+/** Four fingers on a square of half-side `r` round (200, 200). */
+const quad = (r) => [finger(200 - r, 200 - r, 1), finger(200 + r, 200 - r, 2), finger(200 + r, 200 + r, 3), finger(200 - r, 200 + r, 4)];
+/** A 400 × 400 pad following `tp`, with `fingers` landing one by one from 0 ms. */
+function manyDown(fingers, tp = mac()) {
+  const pad = createTrackpad();
+  pad.follow(tp);
+  pad.resize(400, 400);
+  fingers.forEach((_, i) => pad.start(fingers.slice(0, i + 1), 2 * i));
+  return pad;
+}
+
+test('a three-finger swipe up follows the fingers into Mission Control, half the pad being all the way', () => {
+  const pad = manyDown(trio());
+  same(pad.move(trio(0, -40), 30), []); // before the 60 ms settle
+  same(pad.move(trio(0, -40), 70), [{ t: 'g', g: 'missionControl', d: 0.2 }]); // 30 px decides; the Dock catches up
+  same(pad.move(trio(0, -60), 80), [{ t: 'g', g: 'missionControl', d: 0.1 }]);
+  // Released slowly at 30 %: it completes.
+  same(pad.end(trio(0, -60).slice(0, 2), 300), []);
+  same(pad.end([], 310), [{ t: 'ge', g: 'missionControl', ok: true }]);
+});
+
+test('a short swipe released slowly springs back', () => {
+  const pad = manyDown(trio());
+  pad.move(trio(0, -40), 70);
+  same(pad.end([], 300), [{ t: 'ge', g: 'missionControl', ok: false }]);
+});
+
+test('a short swipe flicked on completes', () => {
+  const pad = manyDown(trio());
+  pad.move(trio(0, -35), 70);
+  pad.move(trio(0, -42), 78);
+  same(pad.end([], 82), [{ t: 'ge', g: 'missionControl', ok: true }]);
+});
+
+test('swiping back past where it started does not complete', () => {
+  const pad = manyDown(trio());
+  pad.move(trio(0, -40), 70);
+  pad.move(trio(0, 20), 200);
+  same(pad.end([], 400), [{ t: 'ge', g: 'missionControl', ok: false }]);
+});
+
+test('a three-finger swipe sideways moves between Spaces, fingers to the left negative', () => {
+  const pad = manyDown(trio());
+  same(pad.move(trio(-60, 0), 70), [{ t: 'g', g: 'spaces', d: -0.3 }]);
+  same(pad.end([], 300), [{ t: 'ge', g: 'spaces', ok: true }]);
+});
+
+test('a Dock Gesture the Mac has off does nothing', () => {
+  // A new Mac has App Exposé off.
+  const pad = manyDown(trio());
+  same(pad.move(trio(0, 80), 70), []);
+  same(pad.end([], 300), []);
+  const on = manyDown(trio(), mac({ appExpose: 3 }));
+  same(on.move(trio(0, 40), 70), [{ t: 'g', g: 'appExpose', d: 0.2 }]);
+});
+
+test('four fingers pinching in open Apps, and spreading show the desktop', () => {
+  const pad = manyDown(quad(60));
+  same(pad.move(quad(45), 70), [{ t: 'g', g: 'apps', d: 0.5 }]);
+  same(pad.end([], 300), [{ t: 'ge', g: 'apps', ok: true }]);
+  const spread = manyDown(quad(50));
+  same(spread.move(quad(65), 70), [{ t: 'g', g: 'showDesktop', d: 0.6 }]);
+});
+
+test('with three-finger drag on, the swipes take four fingers', () => {
+  const tp = mac({ threeFingerDrag: true });
+  const three = manyDown(trio(), tp);
+  same(three.move(trio(0, -60), 70), []);
+  const four = manyDown(quad(40), tp);
+  same(four.move(quad(40).map((f) => ({ ...f, y: f.y - 40 })), 70), [{ t: 'g', g: 'missionControl', d: 0.2 }]);
+});
+
+test('a Dock Gesture holds until every finger is up, without jumping when one lifts', () => {
+  const pad = manyDown(trio());
+  pad.move(trio(0, -40), 70);
+  same(pad.end(trio(0, -40).slice(1), 90), []);
+  same(pad.move(trio(0, -40).slice(1), 100), []); // the centre moved because a finger lifted, not the fingers
+  same(pad.move(trio(0, -60).slice(1), 110), [{ t: 'g', g: 'missionControl', d: 0.1 }]);
+});
+
+test('a finger landing late measures again from there', () => {
+  const pad = createTrackpad();
+  pad.follow(mac());
+  pad.resize(400, 400);
+  pad.start(trio().slice(0, 3), 0);
+  pad.move(trio(0, -20), 50);
+  // A fourth finger lands: four-finger swipes are off on a new Mac, so nothing is decided.
+  pad.start([...trio(0, -20), finger(200, 260, 4)], 60);
+  same(pad.move([...trio(0, -70), finger(200, 210, 4)], 200), []);
 });
 
 test('without the Mac trackpad settings, a pinch is just two fingers, as in v1', () => {
