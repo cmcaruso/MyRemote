@@ -55,12 +55,9 @@ export function gestureFoot(tp) {
   return `${foot} On this version of macOS, Mission Control, App Exposé, Spaces, Show Desktop and Apps happen at once instead of following your fingers.`;
 }
 
-/** Recognition thresholds, from the gestures-feel prototype (#45). */
+/** Recognition timings, from the gestures-feel prototype (#45). */
 export const GESTURE = Object.freeze({
   settleMs: 60, // after the finger count last changed, before deciding
-  pinchPct: 15, // % change in finger spread that makes a pinch
-  rotateDeg: 15, // degrees of turn that make a rotate
-  rotateTravel: 25, // px the fingers may travel and still rotate
   dblMs: 300, // window for the second two-finger tap of a smart zoom
 });
 
@@ -83,17 +80,21 @@ export function shape(touches) {
 }
 
 /**
- * What two fingers are doing since `base`: pinch, rotate, scroll, or null while undecided. Pinch and
- * rotate count only when the Mac has them on.
+ * What two fingers are doing since `base`: pinch, rotate, scroll, or null while undecided. Their motion
+ * splits into how far the centre moved, how far each finger moved toward or away from it, and how far
+ * round it, all in px; once any passes the slop, the biggest decides. A pinch with one finger still moves
+ * the centre as much as the spread, so the spread only has to match half the centre's travel. Pinch and
+ * rotate count only when the Mac has them on; otherwise the fingers scroll.
  * @param {ReturnType<typeof shape>} base @param {ReturnType<typeof shape>} now @param {object} tp @param {number} slop
  */
 export function classifyTwo(base, now, tp, slop) {
   const travel = Math.hypot(now.c.x - base.c.x, now.c.y - base.c.y);
   const spread = Math.abs(now.spread - base.spread);
-  if (tp.pinch && spread > (GESTURE.pinchPct / 100) * base.spread && spread > travel * 0.8) return 'pinch';
-  if (tp.rotate && Math.abs(rotateDelta(base, now)) > GESTURE.rotateDeg && travel < GESTURE.rotateTravel) return 'rotate';
-  if (travel > slop) return 'scroll';
-  return null;
+  const turn = Math.abs(wrap(now.angle - base.angle)) * base.spread;
+  if (Math.max(travel, spread, turn) <= slop) return null;
+  if (tp.pinch && spread >= turn && spread >= travel / 2) return 'pinch';
+  if (tp.rotate && turn > spread && turn >= travel / 2) return 'rotate';
+  return travel > slop ? 'scroll' : null;
 }
 
 /** A pinch's delta: the change in magnification, as AppKit uses it (0.04 = 4 % larger). */

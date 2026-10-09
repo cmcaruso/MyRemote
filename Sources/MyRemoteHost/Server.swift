@@ -67,7 +67,9 @@ struct Server: Sendable {
         let onMic = onMic
 
         let router = Router()
-        router.add(middleware: FileMiddleware(remoteDirectory, searchForIndexHtml: true))
+        // no-cache: the phone checks each file (ETag) every launch, so a new Remote is never stuck in its cache.
+        router.add(middleware: FileMiddleware(
+            remoteDirectory, cacheControl: CacheControl([(MediaType(type: .any), [.noCache])]), searchForIndexHtml: true))
 
         router.post("/pair") { request, _ -> Response in
             let body = try await request.body.collect(upTo: 1024)
