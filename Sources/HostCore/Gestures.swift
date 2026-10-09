@@ -28,8 +28,8 @@ public struct GestureEvent: Equatable, Sendable {
 public struct DockSwipe: Equatable, Sendable {
     public var motion: Motion
     /// Where the swipe has got to, in the Dock's units: vertical, −1 is Mission Control all the way and
-    /// +1 App Exposé; pinch, −1 Show Desktop and +1 Apps; horizontal, one Space is `1 + 1/(spaces − 1)`,
-    /// negative toward the Space on the left.
+    /// +1 App Exposé; pinch, +1 Show Desktop and −1 Apps (field 136, "inverted", left at 0); horizontal,
+    /// one Space is `1 + 1/(spaces − 1)`, negative toward the Space on the left.
     public var offset: Double
     public var phase: GestureEvent.Phase
     /// On Ended or Cancelled, how fast the fingers left: the last change × 100, as Mac Mouse Fix sends it.
@@ -151,8 +151,8 @@ public struct Gestures: Sendable {
     /// fingers to the right (toward the Space on the left) positive.
     private static func scale(_ gesture: Gesture, spaces: Int) -> Double {
         switch gesture {
-        case .missionControl, .showDesktop: -1
-        case .appExpose, .apps: 1
+        case .missionControl, .apps: -1
+        case .appExpose, .showDesktop: 1
         case .spaces: -(1 + 1 / Double(max(spaces, 2) - 1))
         case .pinch, .rotate: 1
         }
