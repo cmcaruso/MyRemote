@@ -79,8 +79,8 @@ struct GesturesTests {
 
     @Test(arguments: [
         (Gesture.appExpose, DockSwipe.Motion.vertical, 0.3),
-        (.showDesktop, .pinch, -0.3),
-        (.apps, .pinch, 0.3),
+        (.showDesktop, .pinch, 0.3),
+        (.apps, .pinch, -0.3),
     ])
     func eachDockGestureHasItsMotionAndDirection(_ gesture: Gesture, _ motion: DockSwipe.Motion, _ offset: Double) {
         var gestures = Gestures(followsFingers: true)
