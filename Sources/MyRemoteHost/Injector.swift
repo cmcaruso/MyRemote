@@ -17,6 +17,14 @@ final class Injector {
     /// Lets go of ⌘ once the App switcher's taps stop.
     private var switcherRelease: Task<Void, Never>?
     private var gestures: Gestures
+    /// The active display's Spaces, read when the fingers touch down, for the Spaces swipe.
+    private var spaceCount = 2
+    /// A dock swipe held back so they go out at most every 8 ms, and when the last one went.
+    private var heldSwipe: DockSwipe?
+    private var lastSwipeAt = 0.0
+    private var swipeFlush: Task<Void, Never>?
+    /// Sends a dock swipe's end again, which the Dock sometimes misses when it's busy.
+    private var swipeEndAgain: Task<Void, Never>?
 
     init(followsFingers: Bool) {
         gestures = Gestures(followsFingers: followsFingers)
@@ -46,6 +54,7 @@ final class Injector {
         case .touchDown:
             stopMomentum()
             gestures.cancel().forEach(post)
+            spaceCount = Dock.spaceCount()
         case let .mediaKey(key):
             postMediaKey(key, down: true)
             postMediaKey(key, down: false)
@@ -63,7 +72,7 @@ final class Injector {
             switcher.tap(at: Self.uptime()).forEach(post)
             releaseSwitcherWhenIdle()
         case .gesture, .gestureEnd, .gestureAction:
-            gestures.apply(command).forEach(post)
+            gestures.apply(command, spaces: spaceCount).forEach(post)
         }
     }
 
@@ -180,6 +189,87 @@ final class Injector {
         event.setIntegerValueField(.scrollWheelEventScrollPhase, value: scroll.phase.rawValue)
         event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: scroll.momentum.rawValue)
         event.post(tap: .cghidEventTap)
+    }
+
+    private func post(_ output: GestureOutput) {
+        switch output {
+        case let .event(event): post(event)
+        case let .dockSwipe(swipe): post(swipe)
+        case .dockAction(.spaceLeft): Keystrokes.press(.left, flags: .control).forEach(post)
+        case .dockAction(.spaceRight): Keystrokes.press(.right, flags: .control).forEach(post)
+        case let .dockAction(action): Dock.send(action)
+        }
+    }
+
+    /// Posts a dock swipe, at most every 8 ms (a faster stream makes the Dock lag), and its end again
+    /// after 0.2 s and 0.5 s.
+    private func post(_ swipe: DockSwipe) {
+        let now = Self.uptime()
+        if swipe.phase == .changed, now - lastSwipeAt < Self.swipeInterval {
+            // Offsets are cumulative, so only the newest held one matters.
+            heldSwipe = swipe
+            guard swipeFlush == nil else { return }
+            swipeFlush = Task { [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(for: .seconds(max(0, self.lastSwipeAt + Self.swipeInterval - Self.uptime())))
+                self.swipeFlush = nil
+                if let held = self.heldSwipe { self.postNow(held) }
+            }
+            return
+        }
+        if swipe.phase != .changed {
+            swipeFlush?.cancel()
+            swipeFlush = nil
+            if swipe.phase != .began, let held = heldSwipe { postNow(held) }
+        }
+        postNow(swipe)
+        swipeEndAgain?.cancel()
+        guard swipe.phase == .ended || swipe.phase == .cancelled else { return }
+        swipeEndAgain = Task { [weak self] in
+            for delay in [0.2, 0.3] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled else { return }
+                self?.postDockSwipe(swipe)
+            }
+        }
+    }
+
+    private static let swipeInterval = 0.008
+
+    private func postNow(_ swipe: DockSwipe) {
+        heldSwipe = nil
+        lastSwipeAt = Self.uptime()
+        postDockSwipe(swipe)
+    }
+
+    /// The trackpad's dock swipe before macOS 27: a type-30 event carrying the motion, offset and phase in
+    /// numbered fields, then a type-29 companion, both at the session tap (Mac Mouse Fix's recipe).
+    private func postDockSwipe(_ swipe: DockSwipe) {
+        let field = { (n: UInt32) in unsafeBitCast(n, to: CGEventField.self) }
+        guard let event = CGEvent(source: nil), let companion = CGEvent(source: nil) else { return }
+        event.type = unsafeBitCast(UInt32(30), to: CGEventType.self)
+        event.setDoubleValueField(field(110), value: 23) // kIOHIDEventTypeDockSwipe
+        event.setDoubleValueField(field(132), value: Double(swipe.phase.rawValue))
+        event.setDoubleValueField(field(134), value: Double(swipe.phase.rawValue))
+        event.setDoubleValueField(field(124), value: swipe.offset)
+        // The offset again, as a Float32's bits in an integer.
+        event.setIntegerValueField(field(135), value: Int64(Float32(swipe.offset).bitPattern))
+        event.setDoubleValueField(field(41), value: 33231)
+        // The motion again, as the denormal double with the same bits as its integer.
+        let motionBits = Double(Float32(bitPattern: UInt32(swipe.motion.rawValue)))
+        event.setDoubleValueField(field(119), value: motionBits)
+        event.setDoubleValueField(field(139), value: motionBits)
+        event.setDoubleValueField(field(123), value: Double(swipe.motion.rawValue))
+        event.setDoubleValueField(field(165), value: Double(swipe.motion.rawValue))
+        event.setIntegerValueField(field(136), value: 0)
+        if swipe.phase == .ended || swipe.phase == .cancelled {
+            event.setDoubleValueField(field(129), value: swipe.exitSpeed)
+            event.setDoubleValueField(field(130), value: swipe.exitSpeed)
+        }
+        companion.type = unsafeBitCast(UInt32(29), to: CGEventType.self)
+        companion.setDoubleValueField(field(41), value: 33231)
+        event.post(tap: .cgSessionEventTap)
+        companion.post(tap: .cgSessionEventTap)
     }
 
     /// Posts a gesture event the way the trackpad's arrive: type 29 (gesture) with its IOHID subtype,

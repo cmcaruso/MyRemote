@@ -341,10 +341,15 @@ function setPadEffect(value) {
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const DOT_REST = [235, 235, 245];
 const DOT_LIT = [10, 132, 255]; // --accent
-/** Lit dots take this colour while an app Gesture (pinch, rotate, smart zoom) is on. */
+/** Lit dots take an app Gesture's colour (pinch, rotate, smart zoom) or a system one's (the Dock Gestures). */
 const DOT_APP = [191, 90, 242];
-/** What the pad says when a Gesture starts. */
-const GESTURE_LABELS = { pinch: 'Zoom', rotate: 'Rotate', smartZoom: 'Smart zoom' };
+const DOT_SYSTEM = [48, 209, 88];
+/** What the pad says when a Gesture starts, and its colour. */
+const GESTURE_LABELS = {
+  pinch: ['Zoom', DOT_APP], rotate: ['Rotate', DOT_APP], smartZoom: ['Smart zoom', DOT_APP],
+  missionControl: ['Mission Control', DOT_SYSTEM], appExpose: ['App Exposé', DOT_SYSTEM],
+  spaces: ['Full-screen apps', DOT_SYSTEM], showDesktop: ['Show Desktop', DOT_SYSTEM], apps: ['Apps', DOT_SYSTEM],
+};
 /** Every surface with a dot grid. */
 const dotLayers = [];
 
@@ -421,9 +426,10 @@ function createDotLayer(el) {
     draw();
   }).observe(el);
 
-  /** Flashes a Gesture's name in the pad. */
-  function say(text) {
+  /** Flashes a Gesture's name in the pad, in its colour. */
+  function say(text, colour) {
     label.textContent = text;
+    label.style.setProperty('--tint', colour.join(' '));
     label.classList.add('on');
     clearTimeout(labelOff);
     labelOff = setTimeout(() => label.classList.remove('on'), 900);
@@ -438,8 +444,9 @@ function createDotLayer(el) {
       for (const c of commands) {
         const name = c.t === 'g' ? c.g : c.t === 'ga' ? c.a : null;
         if (!name || (c.t === 'g' && tint)) continue;
-        tint = DOT_APP;
-        say(GESTURE_LABELS[name] ?? name);
+        const [text, colour] = GESTURE_LABELS[name] ?? [name, DOT_APP];
+        tint = colour;
+        say(text, colour);
       }
       if (!live()) return;
       // In the surface's own pixels, which turn round with the console when it's upside down.
@@ -467,11 +474,14 @@ let trackpad, pointerTrackpad, scrollStrip;
 function rebuildGestures() {
   trackpad = createTrackpad(params);
   trackpad.follow(macTrackpad);
+  trackpad.resize(pad.clientWidth, pad.clientHeight);
   // The Present pointer pad stays a plain trackpad: no Gestures.
   pointerTrackpad = createTrackpad(params);
   scrollStrip = createScrollStrip(params);
 }
 rebuildGestures();
+// A swipe's progress is relative to the pad's size.
+new ResizeObserver(() => trackpad.resize(pad.clientWidth, pad.clientHeight)).observe(pad);
 
 /** Where a touch is as the user sees it: turned with the Remote when it's upside down, so motion follows the thumb. */
 const point = (t) => unturn(t.clientX, t.clientY, { left: 0, top: 0, width: innerWidth, height: innerHeight }, turn);

@@ -48,7 +48,8 @@ public enum Command: Equatable, Sendable {
 
 /// A continuous Gesture the Remote recognised, named on the wire. Units of its deltas: pinch, the change
 /// in magnification (0.04 = 4 % larger); rotate, degrees counter-clockwise; the Dock Gestures, progress,
-/// where 1.0 = half the pad of travel (`spaces` signed, negative = left).
+/// where 1.0 = all the way = half the pad of travel (`spaces` signed, negative = fingers to the left, and
+/// 1.0 = one Space).
 public enum Gesture: String, Sendable {
     case pinch, rotate, missionControl, appExpose, spaces, showDesktop, apps
 }

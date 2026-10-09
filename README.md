@@ -82,7 +82,13 @@ On the pad:
 - **Rotate**: turn two fingers around each other, say in Preview or Photos.
 - **Smart zoom**: double-tap with two fingers. The first tap still right-clicks at once, as before.
 
-The dots turn purple and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding between scroll, pinch and rotate, and a Gesture keeps going until every finger is up. Three or more fingers do nothing yet: the other Gestures in the list are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad.
+- **Mission Control** and **App Exposé**: swipe up or down with three fingers (or four, as the Mac has it).
+- **Swipe between full-screen apps**: swipe left or right with the same fingers to move between Spaces.
+- **Show Desktop** and **Apps**: spread or pinch four or five fingers.
+
+These follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
+
+The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Swipe between pages, Notification Center, Look up and three-finger drag are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad.
 
 ### Phone Mic
 
@@ -116,6 +122,7 @@ The room still hears the speakers a tenth to a fifth of a second after your own 
 - **Wi-Fi stutter.** With the Mac on Wi-Fi, the pointer can stall for about 100 ms a couple of times a second. The Mac's own Wi-Fi causes this, not the tailnet. A wired connection on the Mac avoids it.
 - **Networks that block Tailscale.** Some campus and office Wi-Fi blocks Tailscale, and the Remote can't reach the Mac. Put the iPhone on mobile data, or the Mac on a wired network, or both.
 - **Phone Mic in the background.** iOS doesn't let a web app use the microphone in the background, so keep the Remote open while you talk.
+- **Dock Gestures on other macOS versions.** On macOS other than 26.x, Mission Control, App Exposé, Spaces, Show Desktop and Apps happen at once instead of following your fingers.
 - **Not included:** brightness control and a now-playing display. The Laser is tested over PowerPoint, Google Slides and Safari full screen, but not Keynote.
 
 ## Development
