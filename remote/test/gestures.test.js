@@ -74,18 +74,38 @@ test('a shape is the centroid, the mean spread and the angle between the first t
 
 test('spreading the fingers is a pinch, and its delta is the change in magnification', () => {
   const base = shape(pair(50));
-  assert.equal(classifyTwo(base, shape(pair(55)), tp(), 8), null); // 10 %: not yet
-  assert.equal(classifyTwo(base, shape(pair(60)), tp(), 8), 'pinch'); // 20 %
+  assert.equal(classifyTwo(base, shape(pair(55)), tp(), 8), null); // 5 px: inside the slop
+  assert.equal(classifyTwo(base, shape(pair(60)), tp(), 8), 'pinch');
   assert.equal(classifyTwo(base, shape(pair(40)), tp(), 8), 'pinch'); // closing too
   close(pinchDelta(shape(pair(50)), shape(pair(60))), 0.2);
 });
 
 test('turning the fingers is a rotate, counter-clockwise positive', () => {
   const base = shape(pair(50));
-  assert.equal(classifyTwo(base, shape(pair(50, 10)), tp(), 8), null);
+  assert.equal(classifyTwo(base, shape(pair(50, 5)), tp(), 8), null); // 4 px round: inside the slop
   assert.equal(classifyTwo(base, shape(pair(50, 20)), tp(), 8), 'rotate');
   close(rotateDelta(base, shape(pair(50, 20))), -20); // clockwise on screen
   close(rotateDelta(base, shape(pair(50, -5))), 5);
+});
+
+test('a pinch with one finger still is a pinch, however far apart the fingers are', () => {
+  for (const gap of [60, 120, 200]) {
+    const base = shape([f(1, 100, 300), f(2, 100 + gap, 300 - gap)]);
+    const now = shape([f(1, 100, 300), f(2, 112 + gap, 288 - gap)]); // the index finger 17 px out
+    assert.equal(classifyTwo(base, now, tp(), 8), 'pinch', `${gap} px`);
+  }
+});
+
+test('turning one finger round the other is a rotate', () => {
+  const base = shape([f(1, 100, 300), f(2, 250, 300)]);
+  assert.equal(classifyTwo(base, shape([f(1, 100, 300), f(2, 250, 280)]), tp(), 8), 'rotate');
+});
+
+test('two fingers moving together scroll, even when their gap wobbles', () => {
+  const base = shape(pair(50));
+  // Both down 20 px; one goes 6 px further.
+  const now = shape([f(1, 100, 120), f(2, 200, 126)]);
+  assert.equal(classifyTwo(base, now, tp(), 8), 'scroll');
 });
 
 test('a rotate across ±180° does not jump', () => {
@@ -103,4 +123,7 @@ test('pinch and rotate count only when the Mac has them on', () => {
   const base = shape(pair(50));
   assert.equal(classifyTwo(base, shape(pair(60)), tp({ pinch: false }), 8), null);
   assert.equal(classifyTwo(base, shape(pair(50, 20)), tp({ rotate: false }), 8), null);
+  // Moving as well, they scroll.
+  const moved = shape([f(1, 100, 100), f(2, 240, 100)]); // one finger 40 px out: the centre moves 20
+  assert.equal(classifyTwo(base, moved, tp({ pinch: false }), 8), 'scroll');
 });
