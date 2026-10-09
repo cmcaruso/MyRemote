@@ -77,6 +77,13 @@ With the Mic on, hold the phone upside down, mic toward your mouth, and the Remo
 
 The Remote's trackpad follows the Mac's own trackpad settings for Gestures, so there's nothing to set up on the phone. ⚙ → **Gestures** lists them by the names System Settings → Trackpad uses, with the Mac's current choices: change them on the Mac and the list follows. Look up always shows as a three-finger tap when it's on, because a phone can't force-click. Tap to click, two-finger right-click and scroll direction stay the Remote's own.
 
+On the pad:
+- **Zoom in or out**: pinch two fingers, as on the Mac's trackpad. Apps zoom as the fingers move.
+- **Rotate**: turn two fingers around each other, say in Preview or Photos.
+- **Smart zoom**: double-tap with two fingers. The first tap still right-clicks at once, as before.
+
+The dots turn purple and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding between scroll, pinch and rotate, and a Gesture keeps going until every finger is up. Three or more fingers do nothing yet: the other Gestures in the list are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad.
+
 ### Phone Mic
 
 Tap **Mic** in Present to speak into the iPhone and have the Mac hear it, for example as your microphone in a Teams call. iOS asks for the microphone every time the Remote launches. While it's on, **Mic on** turns red, a **MIC** badge shows in the other Modes, and the phone stays awake. Tap it again to turn it off.

@@ -11,7 +11,8 @@ final class MacTrackpad: NSObject {
 
     private let trackpad = UserDefaults(suiteName: MacTrackpadSettings.trackpadDomain)!
     private let dock = UserDefaults(suiteName: MacTrackpadSettings.dockDomain)!
-    private let followsFingers = MacTrackpadSettings.followsFingers(
+    /// Whether the Dock Gestures follow the fingers on this Mac, fixed at launch.
+    static let followsFingers = MacTrackpadSettings.followsFingers(
         macOSMajor: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
         environment: ProcessInfo.processInfo.environment)
 
@@ -50,7 +51,7 @@ final class MacTrackpad: NSObject {
             trackpad: read(trackpad, MacTrackpadSettings.trackpadDefaults.keys),
             global: read(.standard, MacTrackpadSettings.globalDefaults.keys),
             dock: read(dock, MacTrackpadSettings.dockDefaults.keys),
-            followsFingers: followsFingers)
+            followsFingers: Self.followsFingers)
     }
 
     // KVO from cfprefsd and distributed notifications can arrive on any thread.

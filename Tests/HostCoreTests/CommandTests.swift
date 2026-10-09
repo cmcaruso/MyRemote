@@ -33,6 +33,13 @@ struct CommandTests {
         (#"{"t":"ls"}"#, .laserStart),
         (#"{"t":"l","dx":3,"dy":-1.5}"#, .laserMove(dx: 3, dy: -1.5)),
         (#"{"t":"le"}"#, .laserEnd),
+        (#"{"t":"g","g":"pinch","d":0.04}"#, .gesture(.pinch, delta: 0.04)),
+        (#"{"t":"g","g":"rotate","d":-12.5}"#, .gesture(.rotate, delta: -12.5)),
+        (#"{"t":"g","g":"spaces","d":-0.3}"#, .gesture(.spaces, delta: -0.3)),
+        (#"{"t":"ge","g":"pinch","ok":true}"#, .gestureEnd(.pinch, completes: true)),
+        (#"{"t":"ge","g":"missionControl","ok":false}"#, .gestureEnd(.missionControl, completes: false)),
+        (#"{"t":"ga","a":"smartZoom"}"#, .gestureAction(.smartZoom)),
+        (#"{"t":"ga","a":"pageBack"}"#, .gestureAction(.pageBack)),
     ])
     func decodesEachCommand(_ text: String, _ expected: Command) {
         #expect(Command(decoding: text) == expected)
@@ -55,6 +62,10 @@ struct CommandTests {
         #"{"t":"kp","m":["cmd"]}"#,   // neither
         #"{"t":"kp","c":"a","m":["hyper"]}"#, // unknown modifier
         #"{"t":"l","dx":3}"#,         // Laser move without dy
+        #"{"t":"g","g":"swirl","d":1}"#, // unknown Gesture
+        #"{"t":"g","g":"pinch"}"#,    // Gesture without a delta
+        #"{"t":"ge","g":"pinch"}"#,   // end without ok
+        #"{"t":"ga","a":"undo"}"#,    // unknown action
     ])
     func ignoresFramesItDoesNotUnderstand(_ text: String) {
         #expect(Command(decoding: text) == nil)

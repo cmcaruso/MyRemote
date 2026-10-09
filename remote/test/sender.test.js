@@ -112,3 +112,29 @@ test('coalesces Laser motion like pointer motion, and sends it before the Laser 
 
   assert.deepEqual(socket.frames, [{ t: 'l', dx: 5, dy: -0.5 }, { t: 'le' }]);
 });
+
+test('sends a Gesture delta straight away when the socket is idle', () => {
+  const socket = fakeSocket();
+  createSender(socket).gesture('pinch', 0.04);
+  assert.deepEqual(socket.frames, [{ t: 'g', g: 'pinch', d: 0.04 }]);
+});
+
+test('coalesces Gesture deltas per Gesture, and sends them before the Gesture ends', () => {
+  const socket = fakeSocket({ bufferedAmount: 64 });
+  const sender = createSender(socket);
+
+  sender.gesture('rotate', 3);
+  sender.gesture('rotate', 2);
+  sender.send({ t: 'ge', g: 'rotate', ok: true });
+
+  assert.deepEqual(socket.frames, [{ t: 'g', g: 'rotate', d: 5 }, { t: 'ge', g: 'rotate', ok: true }]);
+});
+
+test('drops Gesture deltas made while disconnected', () => {
+  const socket = fakeSocket({ readyState: 3 });
+  const sender = createSender(socket);
+  sender.gesture('pinch', 0.1);
+  socket.readyState = 1;
+  sender.drain();
+  assert.deepEqual(socket.frames, []);
+});

@@ -23,7 +23,7 @@ final class Host {
     /// The time the menu's "last used" is counted from, refreshed with the status checks.
     private(set) var now = Date.now
 
-    private let injector = Injector()
+    private let injector = Injector(followsFingers: MacTrackpad.followsFingers)
     private let volume = Volume()
     private let laser = LaserOverlay()
     private let macTrackpad = MacTrackpad()
