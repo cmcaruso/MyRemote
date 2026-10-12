@@ -7,7 +7,8 @@ based on, the following work by others.
 
 The Remote's icons (the sprite in `remote/index.html`) come from [Lucide](https://lucide.dev). Some of
 them are derived from [Feather](https://feathericons.com). The play-pause and forward-delete icons are
-made from Lucide icons.
+made from Lucide icons. MyRemote's app icon and the Remote's Home Screen icon (drawn by
+`scripts/icons.swift`) are Lucide's pointer on a gradient.
 
 ISC License
 

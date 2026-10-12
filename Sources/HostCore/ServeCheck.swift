@@ -27,12 +27,20 @@ public enum ServeCheck: Equatable, Sendable {
         }
         self = .notServing
     }
+
+    /// The ports `tailscale serve` already listens on, which Setup mustn't take over.
+    public static func portsInUse(statusJSON: Data) -> Set<Int> {
+        let status = (try? JSONDecoder().decode(Status?.self, from: statusJSON)) ?? nil
+        return Set((status?.TCP ?? [:]).keys.compactMap { Int($0) })
+    }
 }
 
 /// The parts of Tailscale's `ipn.ServeConfig` the check reads.
 private struct Status: Decodable {
     struct Site: Decodable { var Handlers: [String: Handler]? }
     struct Handler: Decodable { var Proxy: String? }
+    struct Listener: Decodable {}
+    var TCP: [String: Listener]?
     var Web: [String: Site]?
     var AllowFunnel: [String: Bool]?
 }

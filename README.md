@@ -14,6 +14,8 @@ Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures
 
 ## Install
 
+The first time you open MyRemote, **Set Up MyRemote** walks you through all of this: it checks each step as you go, turns on `tailscale serve` for you, and shows a QR code that opens the Remote on the iPhone. Open it again any time from the menu. The steps below are the same thing by hand.
+
 ### 1. Tailscale
 
 1. In the [admin console's DNS page](https://login.tailscale.com/admin/dns), enable **MagicDNS** and **HTTPS Certificates**.
@@ -157,18 +159,19 @@ When unbundled, the Host uses your terminal app's Accessibility grant, so rebuil
 
 The layout:
 
-- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` status, menu wording, the Phone Mic's jitter buffer, reading the Mac trackpad settings). It's unit-tested and has no AppKit.
+- `Sources/HostCore`: the Host's pure logic (wire protocol, pointer and scroll math, keystrokes and keyboard layouts, the Laser's motion, Pairing, reading `tailscale serve` and `tailscale status`, which Setup steps are done, menu wording, the Phone Mic's jitter buffer, reading the Mac trackpad settings). It's unit-tested and has no AppKit.
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket, the Phone Mic's `/mic` WebSocket and the `/pair` and `/unpair` requests. It posts input with `CGEvent` and plays the Phone Mic with `AVAudioEngine`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
+- `scripts/icons.swift`: draws the app icon and the Remote's Home Screen icons. Run it with `swift scripts/icons.swift` after changing them.
 - `scripts/dmg.sh`: builds a universal (Apple Silicon and Intel) app into `build/dmg/` and packs it into `build/MyRemote-<version>.dmg` for a release.
 
-`CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Gesture, Mac trackpad settings, Pairing, Laser, Phone Mic).
+`CONTEXT.md` defines the project's vocabulary (Host, Remote, Setup, Mode, Gesture, Mac trackpad settings, Pairing, Laser, Phone Mic).
 
 ## License
 
 MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
 
-The Remote's icons come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
+The Remote's icons and the app icon come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
 
 MyRemote is an independent project, not affiliated with or endorsed by Apple or Tailscale. Mac, macOS, iPhone, iOS, Safari and the other Apple product names are trademarks of Apple Inc., and Tailscale is a trademark of Tailscale Inc.; they're used here only to say what MyRemote works with.

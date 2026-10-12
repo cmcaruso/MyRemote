@@ -39,7 +39,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MyRemote"
 rsync -a --exclude test remote/ "$APP/Contents/Resources/remote/"
 sed "s/__BUNDLE_ID__/$BUNDLE_ID/" scripts/Info.plist > "$APP/Contents/Info.plist"
-cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
+cp LICENSE THIRD_PARTY_NOTICES.md scripts/AppIcon.icns "$APP/Contents/Resources/"
 
 codesign --force --sign "$IDENTITY" "$APP"
 if [ "$IDENTITY" = "-" ]; then
@@ -55,7 +55,9 @@ if [ "${1:-}" = "--run" ]; then
     # Quit System Settings first: if it's open it keeps showing the stale row, and turning that on
     # doesn't grant the new build.
     osascript -e 'tell application "System Settings" to quit' >/dev/null 2>&1 || true
+    # The grant lives under PostEvent (what CGRequestPostEventAccess asks for), not only Accessibility.
     tccutil reset Accessibility "$BUNDLE_ID" >/dev/null 2>&1 || true
+    tccutil reset PostEvent "$BUNDLE_ID" >/dev/null 2>&1 || true
     echo "Grant Accessibility to MyRemote when macOS asks (System Settings → Privacy & Security → Accessibility)."
   fi
   open "$APP"

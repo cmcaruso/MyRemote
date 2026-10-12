@@ -10,6 +10,12 @@ struct MyRemoteApp: App {
         MenuBarExtra("MyRemote", systemImage: "hand.point.up.left") {
             HostMenu(host: delegate.host)
         }
+        Window("Set Up MyRemote", id: SetupWindow.id) {
+            SetupWindow(host: delegate.host)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(delegate.host.opensSetupAtLaunch ? .presented : .suppressed)
+        .restorationBehavior(.disabled)
         Window("Pair a Remote", id: PairWindow.id) {
             PairWindow(pairings: delegate.host.pairings)
         }
@@ -50,6 +56,10 @@ struct HostMenu: View {
         }
         Text(MenuText.remotes(host.remotes))
         Divider()
+        Button(host.setup.complete ? "Setup Guide…" : "Set Up MyRemote…") {
+            openWindow(id: SetupWindow.id)
+            NSApp.activate()
+        }
         Button("Pair a Remote…") {
             host.pairings.newCode()
             openWindow(id: PairWindow.id)

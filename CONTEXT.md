@@ -12,6 +12,10 @@ _Avoid_: server, agent, daemon, desktop app
 The web app opened on the iPhone that the user touches to control the Host.
 _Avoid_: client, controller, phone app
 
+**Setup**:
+The Host's first-run guide from a fresh Mac to a Paired Remote: it checks each step live (Tailscale, HTTPS, `tailscale serve`, Accessibility, the iPhone) and does the ones the Host can. It opens by itself until every step has been done once, then from the menu.
+_Avoid_: onboarding, wizard, installer
+
 **Mode**:
 One of the Remote's screens: Trackpad, Keyboard, Media, or Presentation.
 _Avoid_: tab, view, page

@@ -12,9 +12,15 @@ final class Host {
     private(set) var serving = false
     private(set) var serverError: String?
     private(set) var remotes = 0
-    private(set) var accessibilityGranted = CGPreflightPostEventAccess()
+    private(set) var accessibilityGranted = Host.canPostEvents()
     /// Whether `tailscale serve` reaches the Host; nil until the first check.
     private(set) var serve: ServeCheck?
+    /// Setup's view of Tailscale; nil until Setup first checks.
+    private(set) var tailscale: TailscaleStatus?
+    private(set) var tailscaleInstalled = Tailscale.installed
+    /// Setup's Turn On for serve: running, and what went wrong last time.
+    private(set) var serveStarting = false
+    private(set) var serveProblem: String?
     private(set) var loginItem = LoginItem.status
     private(set) var loginItemError: String?
     let pairings = PairingStore()
@@ -38,9 +44,22 @@ final class Host {
         port = configured > 0 ? configured : 8484
     }
 
+    /// Setup opens by itself until it has once seen every step done. A Host that already has a paired
+    /// Remote predates Setup and skips it.
+    static let setupFinishedKey = "setupFinished"
+    var opensSetupAtLaunch: Bool {
+        !UserDefaults.standard.bool(forKey: Self.setupFinishedKey) && pairings.remotes.isEmpty
+    }
+
+    var setup: Setup {
+        Setup(tailscaleInstalled: tailscaleInstalled, tailscale: tailscale, serve: serve,
+              accessibilityGranted: accessibilityGranted, pairedRemotes: pairings.remotes.count)
+    }
+
     func start() {
         if !accessibilityGranted {
-            _ = CGRequestPostEventAccess()
+            // On first launch Setup asks for it in its turn, rather than macOS's prompt covering Setup.
+            if !opensSetupAtLaunch { _ = CGRequestPostEventAccess() }
             watchAccessibility()
         }
 
@@ -116,6 +135,39 @@ final class Host {
         Task { serve = await Tailscale.checkServe(port: port) }
     }
 
+    /// Looks at everything Setup shows; Setup calls it every couple of seconds while it's open.
+    func refreshSetup() async {
+        accessibilityGranted = Self.canPostEvents()
+        tailscaleInstalled = Tailscale.installed
+        tailscale = await Tailscale.status()
+        serve = await Tailscale.checkServe(port: port)
+        if setup.complete { UserDefaults.standard.set(true, forKey: Self.setupFinishedKey) }
+    }
+
+    func turnOnServe() {
+        serveStarting = true
+        serveProblem = nil
+        Task {
+            switch await Tailscale.startServe(port: port) {
+            case .started:
+                break
+            case let .needsApproval(link):
+                serveProblem = "Your tailnet hasn't allowed Serve yet. Allow it on the page that opened, then click Turn On again."
+                NSWorkspace.shared.open(link)
+            case let .failed(reason):
+                serveProblem = "Couldn't turn it on: \(reason). In Terminal, run tailscale serve --bg \(port)."
+            }
+            await refreshSetup()
+            serveStarting = false
+        }
+    }
+
+    /// Shows macOS's own prompt, which adds MyRemote to the Accessibility list, then the list itself.
+    func requestAccessibility() {
+        _ = CGRequestPostEventAccess()
+        openAccessibilitySettings()
+    }
+
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try LoginItem.set(enabled)
@@ -160,12 +212,18 @@ final class Host {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
+    /// CGPreflightPostEventAccess answers once per launch and keeps that answer, so a grant made while the
+    /// Host runs never shows; AXIsProcessTrusted asks macOS again each time.
+    private static func canPostEvents() -> Bool {
+        AXIsProcessTrusted() || CGPreflightPostEventAccess()
+    }
+
     /// Accessibility is granted in System Settings while the Host runs; notice it without a restart.
     private func watchAccessibility() {
         Task {
             while !accessibilityGranted {
                 try? await Task.sleep(for: .seconds(2))
-                accessibilityGranted = CGPreflightPostEventAccess()
+                accessibilityGranted = Self.canPostEvents()
             }
         }
     }
