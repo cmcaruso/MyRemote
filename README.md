@@ -156,3 +156,5 @@ The layout:
 MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
 
 The Remote's icons come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
+
+MyRemote is an independent project, not affiliated with or endorsed by Apple or Tailscale. Mac, macOS, iPhone, iOS, Safari and the other Apple product names are trademarks of Apple Inc., and Tailscale is a trademark of Tailscale Inc.; they're used here only to say what MyRemote works with.
