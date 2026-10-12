@@ -72,6 +72,13 @@ struct GesturesTests {
                                                                   event(.pageSwipe(back: false), .ended)])
     }
 
+    @Test(arguments: [true, false])
+    func notificationCenterAndLookUpAreOneShots(_ followsFingers: Bool) {
+        var gestures = Gestures(followsFingers: followsFingers)
+        #expect(gestures.apply(.gestureAction(.notificationCenter)) == [.notificationCenter])
+        #expect(gestures.apply(.gestureAction(.lookUp)) == [.lookUp])
+    }
+
     @Test func otherCommandsPostNothing() {
         var gestures = Gestures(followsFingers: true)
         #expect(gestures.apply(.move(dx: 1, dy: 1)) == [])

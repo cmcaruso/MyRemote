@@ -59,6 +59,10 @@ public enum GestureOutput: Equatable, Sendable {
     case event(GestureEvent)
     case dockSwipe(DockSwipe)
     case dockAction(DockAction)
+    /// Notification Center, which no gesture event opens: the Host presses the menu-bar clock.
+    case notificationCenter
+    /// Look up, which needs a force click or a real three-finger tap: the Host presses its shortcut, ⌃⌘D.
+    case lookUp
 }
 
 /// Turns the Remote's Gesture commands into gesture events, dock swipes or Dock actions. At most one
@@ -120,6 +124,10 @@ public struct Gestures: Sendable {
         case let .gestureAction(action) where action == .pageBack || action == .pageForward:
             let kind = GestureEvent.Kind.pageSwipe(back: action == .pageBack)
             return [.event(GestureEvent(kind, phase: .began)), .event(GestureEvent(kind, phase: .ended))]
+        case .gestureAction(.notificationCenter):
+            return [.notificationCenter]
+        case .gestureAction(.lookUp):
+            return [.lookUp]
         default:
             return []
         }

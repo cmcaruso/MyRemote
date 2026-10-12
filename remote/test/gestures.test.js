@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyMany, classifyTwo, completes, dockProgress, effective, gestureFoot, gestureRows, pinchDelta, rotateDelta, shape } from '../gestures.js';
+import { classifyMany, classifyTwo, completes, dockProgress, effective, fromRightEdge, gestureFoot, gestureRows, pinchDelta, rotateDelta, shape } from '../gestures.js';
 
 /** A new Mac's settings, as the Host pushes them. */
 const tp = (fields = {}) => ({
@@ -126,6 +126,16 @@ test('pinch and rotate count only when the Mac has them on', () => {
   // Moving as well, they scroll.
   const moved = shape([f(1, 100, 100), f(2, 240, 100)]); // one finger 40 px out: the centre moves 20
   assert.equal(classifyTwo(base, moved, tp({ pinch: false }), 8), 'scroll');
+});
+
+test('two fingers swipe in from the right edge when the right-hand one lands within 32 px of it and they go left', () => {
+  const pad = { width: 320 };
+  const at = (x, dx = 0, dy = 0) => shape([f(1, x - 45 + dx, 200 + dy), f(2, x + dx, 205 + dy)]);
+  assert.equal(at(300).right, 300);
+  assert.equal(fromRightEdge(at(300), at(300, -20, 4), pad), true);
+  assert.equal(fromRightEdge(at(280), at(280, -20, 4), pad), false); // 40 px in
+  assert.equal(fromRightEdge(at(300), at(300, 20), pad), false); // going right
+  assert.equal(fromRightEdge(at(300), at(300, -10, 20), pad), false); // mostly down
 });
 
 // ---------- The Dock Gestures ----------
