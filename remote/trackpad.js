@@ -62,8 +62,8 @@ export function createTrackpad(params = {}) {
 
   /**
    * idle | one (one finger) | two (two fingers, undecided) | scroll | pinch | rotate | many (three or more
-   * fingers, undecided) | dock (a Dock Gesture, or a three-finger page swipe) | done (wait for all fingers
-   * up). Pinch, rotate, many and dock come only with the Mac's settings.
+   * fingers, undecided) | dock (a Dock Gesture, or a three-finger page swipe) | drag3 (three-finger drag)
+   * | done (wait for all fingers up). Pinch, rotate, many, dock and drag3 come only with the Mac's settings.
    */
   let mode = 'idle';
   let start = null; // first finger at touch-down: { x, y, t }
@@ -82,6 +82,7 @@ export function createTrackpad(params = {}) {
   let downAt = 0; // when the first finger of this touch landed
   let most = 0; // the most fingers down at once since three or more landed
   let manyMoved = false; // they moved past the slop: not a tap
+  let held = null; // three-finger drag: the fingers' last centre, count and time, { x, y, n, t }
   // The Gesture under way: { g, last (shape), progress, spread (where a pinch began) }. A page swipe
   // ('pages') sends nothing until the fingers lift, then goes back or forward once.
   let dock = null;
@@ -182,6 +183,12 @@ export function createTrackpad(params = {}) {
         const now = shape(touches);
         if (now.n === base.n && Math.hypot(now.c.x - base.c.x, now.c.y - base.c.y) > p.slop) manyMoved = true;
         if (t - countAt < GESTURE.settleMs) return out;
+        // With three-finger drag on, three fingers moving hold the button down and drag, as on the Mac.
+        if (mac.threeFingerDrag && now.n === 3 && manyMoved) {
+          mode = 'drag3';
+          held = { x: now.c.x, y: now.c.y, n: now.n, t };
+          return [{ t: 'd' }];
+        }
         const g = classifyMany(base, now, mac);
         if (g) {
           mode = 'dock';
@@ -191,6 +198,15 @@ export function createTrackpad(params = {}) {
         }
       } else if (mode === 'dock' && touches.length > 0) {
         return followDock(touches, t);
+      } else if (mode === 'drag3' && touches.length > 0) {
+        const now = shape(touches);
+        // A finger lifted or came back: carry on from the new centre.
+        if (now.n === held.n) {
+          const dx = now.c.x - held.x, dy = now.c.y - held.y;
+          const g = gain(Math.hypot(dx, dy) / Math.max(t - held.t, 4));
+          if (dx || dy) out.push({ t: 'm', dx: dx * g, dy: dy * g });
+        }
+        held = { x: now.c.x, y: now.c.y, n: now.n, t };
       } else if ((mode === 'pinch' || mode === 'rotate') && touches.length >= 2) {
         const now = shape(touches);
         // A finger lifted or came back: carry on from the new shape.
@@ -256,6 +272,13 @@ export function createTrackpad(params = {}) {
           if (dock.g !== 'pages') out.push({ t: 'ge', g: dock.g, ok });
           else if (ok) out.push({ t: 'ga', a: dock.progress > 0 ? 'pageBack' : 'pageForward' });
           dock = null;
+          mode = 'idle';
+        }
+      } else if (mode === 'drag3') {
+        // The drag holds until every finger is up.
+        if (left === 0) {
+          out.push({ t: 'u' });
+          held = null;
           mode = 'idle';
         }
       } else if (mode === 'many' && left > 0) {

@@ -6,13 +6,14 @@
 
 /**
  * The snapshot as the Remote follows it. Three-finger drag takes three fingers, so the swipes that
- * would use three take four, as on the Mac.
+ * would use three take four, as on the Mac, and swiping between pages keeps only its two-finger way.
  * @param {object} tp the Host's snapshot
  */
 export function effective(tp) {
   if (!tp.threeFingerDrag) return tp;
   const four = (n) => (n === 3 ? 4 : n);
-  return { ...tp, spaces: four(tp.spaces), missionControl: four(tp.missionControl), appExpose: four(tp.appExpose) };
+  const pages = tp.pages === '2or3' ? '2' : tp.pages === '3' ? 'off' : tp.pages;
+  return { ...tp, pages, spaces: four(tp.spaces), missionControl: four(tp.missionControl), appExpose: four(tp.appExpose) };
 }
 
 const onOff = (on) => (on ? 'On' : 'Off');
