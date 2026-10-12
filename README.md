@@ -2,17 +2,17 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures, and a Remote has to be paired before it can control the Mac. There are no prebuilt downloads: you build it from source for your own Mac and tailnet. One install serves one user and one Mac.
+Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures, and a Remote has to be paired before it can control the Mac. Download it from [Releases](https://github.com/cmcaruso/MyRemote/releases/latest), or build it from source. One install serves one user and one Mac.
 
 ## Requirements
 
-- A Mac on macOS 15 or later, with the Swift 6 toolchain (Xcode, or just the Command Line Tools: `xcode-select --install`).
+- A Mac on macOS 15 or later. To build from source, the Swift 6 toolchain too (Xcode, or just the Command Line Tools: `xcode-select --install`).
 - An iPhone on iOS 18.4 or later.
 - [Tailscale](https://tailscale.com/download) on both, logged in to the same tailnet.
 - Node 24, only to run the Remote's tests.
 - [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole), only to use the Phone Mic as a microphone in calls (see [Phone Mic](#phone-mic)).
 
-## Build from source
+## Install
 
 ### 1. Tailscale
 
@@ -26,7 +26,20 @@ Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures
 
    `tailscale serve status` shows your Mac's address, `https://<your-mac>.<your-tailnet>.ts.net`.
 
-### 2. Build and run
+### 2. Get the app
+
+Download it, or build it from source.
+
+#### Download
+
+1. Download `MyRemote-<version>.dmg` from the [latest release](https://github.com/cmcaruso/MyRemote/releases/latest), open it, and drag MyRemote to Applications.
+2. Open MyRemote from Applications. The app isn't notarized by Apple (that needs a paid developer account), so macOS says it can't verify it. Click **Done**.
+3. In **System Settings → Privacy & Security**, scroll down to "MyRemote was blocked", click **Open Anyway** and confirm. macOS remembers this, so you only do it once per version.
+4. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted".
+
+When you update to a new version, macOS asks for Accessibility again: the switch may still look on, so remove MyRemote from the list with **−** and turn on the new one when macOS asks.
+
+#### Build from source
 
 ```sh
 git clone https://github.com/cmcaruso/MyRemote.git
@@ -148,6 +161,7 @@ The layout:
 - `Sources/MyRemoteHost`: the menubar app. It serves `remote/`, the `/ws` WebSocket, the Phone Mic's `/mic` WebSocket and the `/pair` and `/unpair` requests. It posts input with `CGEvent` and plays the Phone Mic with `AVAudioEngine`.
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
+- `scripts/dmg.sh`: builds a universal (Apple Silicon and Intel) app into `build/dmg/` and packs it into `build/MyRemote-<version>.dmg` for a release.
 
 `CONTEXT.md` defines the project's vocabulary (Host, Remote, Mode, Gesture, Mac trackpad settings, Pairing, Laser, Phone Mic).
 

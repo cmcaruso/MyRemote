@@ -4,6 +4,10 @@
 #   scripts/bundle.sh          build and sign
 #   scripts/bundle.sh --run    also quit the running Host and open the new one
 #
+# The app is built for this Mac's architecture. MYREMOTE_UNIVERSAL=1 builds it for both Apple Silicon
+# and Intel, and MYREMOTE_OUT puts it in another folder than build/, as scripts/dmg.sh does for a
+# release.
+#
 # Signing is ad hoc by default. macOS ties the Accessibility grant to the signature, which an ad-hoc
 # build changes every time, so each rebuild needs the grant again (--run resets the stale entry so
 # macOS asks cleanly). If you rebuild the app often, sign with a stable identity of your own by
@@ -24,10 +28,12 @@ if [ "$IDENTITY" != "-" ] && ! security find-identity -p codesigning | grep -q "
   exit 1
 fi
 
-swift build -c release --product MyRemoteHost
-BIN="$(swift build -c release --show-bin-path)/MyRemoteHost"
+ARCHS=""
+[ "${MYREMOTE_UNIVERSAL:-}" = 1 ] && ARCHS="--arch arm64 --arch x86_64"
+swift build -c release --product MyRemoteHost $ARCHS
+BIN="$(swift build -c release $ARCHS --show-bin-path)/MyRemoteHost"
 
-APP=build/MyRemote.app
+APP="${MYREMOTE_OUT:-build}/MyRemote.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MyRemote"
