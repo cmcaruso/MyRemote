@@ -87,11 +87,12 @@ On the pad:
 - **Swipe between full-screen apps**: swipe left or right with the same fingers to move between Spaces.
 - **Show Desktop** and **Apps**: spread or pinch four or five fingers.
 - **Notification Center**: put two fingers at the pad's right edge and swipe left. It opens at once, and the same swipe closes it.
+- **Three-finger drag**: if the Mac has it on (System Settings → Accessibility → Pointer Control → Trackpad Options), move three fingers to drag a window or select text; lift them all to let go. The three-finger swipes then take four fingers, as on the Mac, and three fingers no longer swipe between pages.
 - **Look up & data detectors**: tap with three fingers to look up the word under the pointer. It works this way even when the Mac looks up with Force Click, because a phone can't force-click.
 
 These follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
 
-The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Three-finger drag is coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
+The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
 
 ### Phone Mic
 

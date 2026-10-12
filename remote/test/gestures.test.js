@@ -16,6 +16,13 @@ test('three-finger drag pushes the three-finger swipes to four fingers', () => {
   assert.deepEqual(effective(tp()).spaces, 3);
 });
 
+test('three-finger drag leaves swiping between pages only its two-finger way', () => {
+  assert.equal(effective(tp({ threeFingerDrag: true, pages: '2or3', spaces: 4 })).pages, '2');
+  assert.equal(effective(tp({ threeFingerDrag: true, pages: '3', spaces: 4 })).pages, 'off');
+  assert.equal(effective(tp({ threeFingerDrag: true })).pages, '2');
+  assert.equal(effective(tp({ pages: '3' })).pages, '3');
+});
+
 test('lists the 12 Gesture settings by their Mac names and in the Mac’s order', () => {
   assert.deepEqual(gestureRows(tp()), [
     ['Look up & data detectors', 'Tap with 3 fingers'],

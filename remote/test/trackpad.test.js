@@ -359,10 +359,36 @@ test('four fingers pinching in open Apps, and spreading show the desktop', () =>
   same(spread.move(quad(65), 70), [{ t: 'g', g: 'showDesktop', d: 0.6 }]);
 });
 
+test('with three-finger drag on, three fingers moving drag: button down, moves, button up when all lift', () => {
+  const pad = manyDown(trio(), mac({ threeFingerDrag: true }));
+  same(pad.move(trio(0, 4), 40), []); // inside the slop
+  same(pad.move(trio(0, 20), 70), [{ t: 'd' }]);
+  // 10 px in 30 ms: v = 1/3 px/ms, gain = 1.6 × (1 + 1.2 / 3) = 2.24
+  same(pad.move(trio(10, 20), 100), [{ t: 'm', dx: 22.4, dy: 0 }]);
+  same(pad.end(trio(10, 20).slice(1), 120), []);
+  same(pad.move(trio(30, 20).slice(1), 130), []); // a finger lifted: carry on from the new centre
+  same(pad.end([], 200), [{ t: 'u' }]);
+});
+
+test('with three-finger drag on, a three-finger tap still looks up and a sideways swipe drags', () => {
+  const tp = mac({ threeFingerDrag: true, pages: '3', spaces: 4 });
+  const tap = manyDown(trio(), tp);
+  same(tap.end([], 150), [{ t: 'ga', a: 'lookUp' }]);
+  const sideways = manyDown(trio(), tp);
+  same(sideways.move(trio(60, 0), 70), [{ t: 'd' }]);
+  same(sideways.end([], 300), [{ t: 'u' }]);
+});
+
+test('without three-finger drag, three fingers moving never press the button', () => {
+  const pad = manyDown(trio(), mac({ missionControl: 0 }));
+  same(pad.move(trio(0, -60), 70), []);
+  same(pad.end([], 300), []);
+});
+
 test('with three-finger drag on, the swipes take four fingers', () => {
   const tp = mac({ threeFingerDrag: true });
   const three = manyDown(trio(), tp);
-  same(three.move(trio(0, -60), 70), []);
+  same(three.move(trio(0, -60), 70), [{ t: 'd' }]); // three fingers drag instead
   const four = manyDown(quad(40), tp);
   same(four.move(quad(40).map((f) => ({ ...f, y: f.y - 40 })), 70), [{ t: 'g', g: 'missionControl', d: 0.2 }]);
 });
