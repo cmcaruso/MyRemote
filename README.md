@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures, and a Remote has to be paired before it can control the Mac. Download it from [Releases](https://github.com/cmcaruso/MyRemote/releases/latest), or build it from source. One install serves one user and one Mac.
+Status: v1.2. All four Modes work, the trackpad does the Mac trackpad's Gestures, a Setup guide walks a new Mac through Tailscale and pairing, and a Remote has to be paired before it can control the Mac. Download it from [Releases](https://github.com/cmcaruso/MyRemote/releases/latest), or build it from source. One install serves one user and one Mac.
 
 ## Requirements
 
