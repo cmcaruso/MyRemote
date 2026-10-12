@@ -13,6 +13,16 @@ public struct ScrollEvent: Equatable, Sendable {
         self.momentum = momentum
     }
 
+    /// The deltas for the gesture-scroll event (type 29, subtype 6) a trackpad sends with each scroll
+    /// while the fingers are down, which lets Safari and Preview swipe between pages; nil while coasting.
+    /// Scaled as Mac Mouse Fix does, so a swipe is as easy to start as on the trackpad.
+    public var gesture: (dx: Double, dy: Double)? {
+        guard phase != .none else { return nil }
+        return (Double(dx) * Self.gestureScale, Double(dy) * Self.gestureScale)
+    }
+
+    public static let gestureScale = 1.67
+
     /// `CGScrollPhase` values.
     public enum Phase: Int64, Sendable {
         case none = 0, began = 1, changed = 2, ended = 4

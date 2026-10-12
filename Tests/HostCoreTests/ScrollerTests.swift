@@ -9,6 +9,16 @@ struct ScrollerTests {
         #expect(scroller.scroll(dx: 3, dy: -7) == ScrollEvent(dx: 3, dy: -7, phase: .changed))
     }
 
+    @Test func scrollsWhileTheFingersAreDownCarryGestureDeltasButCoastingDoesNot() {
+        var scroller = Scroller()
+        let began = scroller.scroll(dx: -10, dy: 0)
+        #expect(began.gesture?.dx == -10 * ScrollEvent.gestureScale)
+        #expect(began.gesture?.dy == 0)
+        let ended = scroller.end(vx: -1, vy: 0)
+        #expect(ended.map { $0.gesture == nil } == [false])
+        #expect(scroller.momentumFrame()?.gesture == nil)
+    }
+
     @Test func carriesFractionsSoSlowScrollingStillMoves() {
         var scroller = Scroller()
         let events = (0..<5).map { _ in scroller.scroll(dx: 0.4, dy: -0.4) }

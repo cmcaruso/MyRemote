@@ -81,6 +81,7 @@ On the pad:
 - **Zoom in or out**: pinch two fingers, as on the Mac's trackpad. Apps zoom as the fingers move.
 - **Rotate**: turn two fingers around each other, say in Preview or Photos.
 - **Smart zoom**: double-tap with two fingers. The first tap still right-clicks at once, as before.
+- **Swipe between pages**: scroll sideways with two fingers in Safari and the page slides with them, as on the Mac. If the Mac swipes between pages with three fingers, a three-finger swipe right goes back and left goes forward once you lift (a quarter of the pad's width, or a flick).
 
 - **Mission Control** and **App Exposé**: swipe up or down with three fingers (or four, as the Mac has it).
 - **Swipe between full-screen apps**: swipe left or right with the same fingers to move between Spaces.
@@ -88,7 +89,7 @@ On the pad:
 
 These follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
 
-The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Swipe between pages, Notification Center, Look up and three-finger drag are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad.
+The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Notification Center, Look up and three-finger drag are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
 
 ### Phone Mic
 

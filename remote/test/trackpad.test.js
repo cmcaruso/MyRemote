@@ -279,6 +279,23 @@ test('a three-finger swipe sideways moves between Spaces, fingers to the left ne
   same(pad.end([], 300), [{ t: 'ge', g: 'spaces', ok: true }]);
 });
 
+test('three fingers swipe between pages: nothing while they move, then back or forward once', () => {
+  const tp = mac({ pages: '3', spaces: 4 });
+  const back = manyDown(trio(), tp);
+  same(back.move(trio(40, 0), 70), []);
+  same(back.move(trio(80, 0), 90), []);
+  same(back.end([], 300), [{ t: 'ga', a: 'pageBack' }]); // fingers to the right, 40 %
+  const forward = manyDown(trio(), tp);
+  forward.move(trio(-80, 0), 70);
+  same(forward.end([], 300), [{ t: 'ga', a: 'pageForward' }]);
+});
+
+test('a short page swipe released slowly does nothing', () => {
+  const pad = manyDown(trio(), mac({ pages: '2or3', spaces: 4 }));
+  pad.move(trio(40, 0), 70);
+  same(pad.end([], 300), []);
+});
+
 test('a Dock Gesture the Mac has off does nothing', () => {
   // A new Mac has App Exposé off.
   const pad = manyDown(trio());
