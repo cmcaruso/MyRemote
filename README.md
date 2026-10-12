@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: v1. All four Modes work, and a Remote has to be paired before it can control the Mac. There are no prebuilt downloads: you build it from source for your own Mac and tailnet. One install serves one user and one Mac.
+Status: v1.1. All four Modes work, the trackpad does the Mac trackpad's Gestures, and a Remote has to be paired before it can control the Mac. There are no prebuilt downloads: you build it from source for your own Mac and tailnet. One install serves one user and one Mac.
 
 ## Requirements
 
@@ -82,17 +82,17 @@ On the pad:
 - **Rotate**: turn two fingers around each other, say in Preview or Photos.
 - **Smart zoom**: double-tap with two fingers. The first tap still right-clicks at once, as before.
 - **Swipe between pages**: scroll sideways with two fingers in Safari and the page slides with them, as on the Mac. If the Mac swipes between pages with three fingers, a three-finger swipe right goes back and left goes forward once you lift (a quarter of the pad's width, or a flick).
+- **Look up & data detectors**: tap with three fingers to look up the word under the pointer. It works this way even when the Mac looks up with Force Click, because a phone can't force-click.
+- **Three-finger drag**: if the Mac has it on (System Settings → Accessibility → Pointer Control → Trackpad Options), move three fingers to drag a window or select text; lift them all to let go. The three-finger swipes then take four fingers, as on the Mac, and three fingers no longer swipe between pages.
+- **Notification Center**: put two fingers at the pad's right edge and swipe left. It opens at once, and the same swipe closes it.
 
 - **Mission Control** and **App Exposé**: swipe up or down with three fingers (or four, as the Mac has it).
 - **Swipe between full-screen apps**: swipe left or right with the same fingers to move between Spaces.
 - **Show Desktop** and **Apps**: spread or pinch four or five fingers.
-- **Notification Center**: put two fingers at the pad's right edge and swipe left. It opens at once, and the same swipe closes it.
-- **Three-finger drag**: if the Mac has it on (System Settings → Accessibility → Pointer Control → Trackpad Options), move three fingers to drag a window or select text; lift them all to let go. The three-finger swipes then take four fingers, as on the Mac, and three fingers no longer swipe between pages.
-- **Look up & data detectors**: tap with three fingers to look up the word under the pointer. It works this way even when the Mac looks up with Force Click, because a phone can't force-click.
 
-These follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
+Mission Control, App Exposé, full-screen apps, Show Desktop and Apps follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
 
-The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
+The dots turn purple for the app Gestures and green for the Dock ones and Notification Center, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
 
 ### Phone Mic
 
