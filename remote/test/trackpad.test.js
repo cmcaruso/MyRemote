@@ -167,6 +167,30 @@ function twoDown(tp = mac()) {
   return pad;
 }
 
+/** Two fingers 45 px apart, the right-hand one at `x` on a 320 px pad, moved by `dx`, `dy`. */
+const edgePair = (x, dx = 0, dy = 0) => [finger(x - 45 + dx, 200 + dy, 1), finger(x + dx, 205 + dy, 2)];
+
+test('two fingers swiping left in from the right edge open Notification Center once', () => {
+  const pad = twoDown();
+  pad.end([], 120); // a two-finger tap first: right-click
+  pad.start([edgePair(305)[0]], 500);
+  pad.start(edgePair(305), 505);
+  same(pad.move(edgePair(305, -20, 3), 570), [{ t: 'ga', a: 'notificationCenter' }]);
+  same(pad.move(edgePair(305, -60, 3), 590), []);
+  same(pad.end([], 700), []);
+});
+
+test('from the edge, a swipe the Mac has off, or one going right, scrolls', () => {
+  const off = twoDown(mac({ notificationCenter: false }));
+  off.end([], 120);
+  off.start(edgePair(305), 500);
+  same(off.move(edgePair(305, -20), 570), [{ t: 's', dx: -30, dy: 0 }]);
+  const right = twoDown();
+  right.end([], 120);
+  right.start(edgePair(305), 500);
+  same(right.move(edgePair(305, 10), 570), [{ t: 's', dx: 15, dy: 0 }]);
+});
+
 test('a pinch waits for the fingers to settle, then sends magnification deltas', () => {
   const pad = twoDown();
   same(pad.move(pair(60), 30), []); // before the 60 ms settle
@@ -242,6 +266,28 @@ function manyDown(fingers, tp = mac()) {
   fingers.forEach((_, i) => pad.start(fingers.slice(0, i + 1), 2 * i));
   return pad;
 }
+
+test('three fingers tapping look up, and only a quick, still tap of three', () => {
+  const tap = (tp, fingers = trio(), lift = 150) => {
+    const pad = manyDown(fingers, tp);
+    pad.move(fingers, 80);
+    return pad.end([], lift);
+  };
+  same(tap(mac()), [{ t: 'ga', a: 'lookUp' }]);
+  same(tap(mac({ lookUp: false })), []);
+  same(tap(mac(), trio(), 400), []); // held too long
+  same(tap(mac(), quad(40)), []); // four fingers
+  const moved = manyDown(trio());
+  moved.move(trio(0, 20), 40); // under the settle, but past the slop
+  same(moved.end([], 150), []);
+});
+
+test('a three-finger tap lifted a finger at a time still looks up once', () => {
+  const pad = manyDown(trio());
+  same(pad.end(trio().slice(1), 120), []);
+  same(pad.end(trio().slice(2), 125), []);
+  same(pad.end([], 130), [{ t: 'ga', a: 'lookUp' }]);
+});
 
 test('a three-finger swipe up follows the fingers into Mission Control, half the pad being all the way', () => {
   const pad = manyDown(trio());

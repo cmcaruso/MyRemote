@@ -7,7 +7,7 @@
  * wire format.
  */
 
-import { GESTURE, classifyMany, classifyTwo, completes, dockProgress, pinchDelta, rotateDelta, shape } from './gestures.js';
+import { GESTURE, classifyMany, classifyTwo, completes, dockProgress, fromRightEdge, pinchDelta, rotateDelta, shape } from './gestures.js';
 
 /** Gesture timings and the acceleration curve; v1 defaults from the trackpad-feel prototype. */
 export const DEFAULTS = Object.freeze({
@@ -79,6 +79,9 @@ export function createTrackpad(params = {}) {
   let base = null; // the two fingers' shape when they landed, or when the Gesture last moved
   let lastTwoTap = null; // end of the last two-finger tap, for smart zoom
   let countAt = 0; // when the finger count last changed, while three or more are undecided
+  let downAt = 0; // when the first finger of this touch landed
+  let most = 0; // the most fingers down at once since three or more landed
+  let manyMoved = false; // they moved past the slop: not a tap
   // The Gesture under way: { g, last (shape), progress, spread (where a pinch began) }. A page swipe
   // ('pages') sends nothing until the fingers lift, then goes back or forward once.
   let dock = null;
@@ -111,6 +114,7 @@ export function createTrackpad(params = {}) {
     /** @param {Touch[]} touches all touches now down @param {number} t event time, ms */
     start(touches, t) {
       const out = mode === 'idle' ? [{ t: 'x' }] : [];
+      if (mode === 'idle') downAt = t;
       if (touches.length === 1 && mode === 'idle') {
         const f = touches[0];
         mode = 'one';
@@ -121,6 +125,11 @@ export function createTrackpad(params = {}) {
         secondTap = lastTap !== null && t - lastTap.t < p.dblMs && Math.hypot(f.x - lastTap.x, f.y - lastTap.y) < 60;
       } else if (mac && touches.length >= 3 && (mode === 'idle' || mode === 'two' || mode === 'many' || (mode === 'one' && !dragging))) {
         // Measure again from here, once the fingers settle.
+        if (mode !== 'many') {
+          most = 0;
+          manyMoved = mode === 'one' && moved;
+        }
+        most = Math.max(most, touches.length);
         mode = 'many';
         countAt = t;
         base = shape(touches);
@@ -146,6 +155,10 @@ export function createTrackpad(params = {}) {
           return out;
         }
         if (kind !== 'scroll') return out;
+        if (mac.notificationCenter && fromRightEdge(base, shape(touches), size)) {
+          mode = 'done';
+          return [{ t: 'ga', a: 'notificationCenter' }];
+        }
         mode = 'scroll';
       }
       if (mode === 'one' && touches.length === 1) {
@@ -166,8 +179,9 @@ export function createTrackpad(params = {}) {
         }
         last = { x: f.x, y: f.y, t };
       } else if (mode === 'many' && touches.length >= 3) {
-        if (t - countAt < GESTURE.settleMs) return out;
         const now = shape(touches);
+        if (now.n === base.n && Math.hypot(now.c.x - base.c.x, now.c.y - base.c.y) > p.slop) manyMoved = true;
+        if (t - countAt < GESTURE.settleMs) return out;
         const g = classifyMany(base, now, mac);
         if (g) {
           mode = 'dock';
@@ -248,6 +262,10 @@ export function createTrackpad(params = {}) {
         countAt = t;
         base = shape(touches);
       } else if ((mode === 'done' || mode === 'many') && left === 0) {
+        // Three fingers tapping look up what's under the pointer, even where the Mac uses Force Click.
+        if (mode === 'many' && mac.lookUp && most === 3 && !manyMoved && t - downAt < p.tapMs * 1.5) {
+          out.push({ t: 'ga', a: 'lookUp' });
+        }
         mode = 'idle';
       }
       return out;

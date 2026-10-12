@@ -347,7 +347,8 @@ const DOT_SYSTEM = [48, 209, 88];
 /** What the pad says when a Gesture starts, and its colour. */
 const GESTURE_LABELS = {
   pinch: ['Zoom', DOT_APP], rotate: ['Rotate', DOT_APP], smartZoom: ['Smart zoom', DOT_APP],
-  pageBack: ['Back', DOT_APP], pageForward: ['Forward', DOT_APP],
+  pageBack: ['Back', DOT_APP], pageForward: ['Forward', DOT_APP], lookUp: ['Look up', DOT_APP],
+  notificationCenter: ['Notification Center', DOT_SYSTEM],
   missionControl: ['Mission Control', DOT_SYSTEM], appExpose: ['App Exposé', DOT_SYSTEM],
   spaces: ['Full-screen apps', DOT_SYSTEM], showDesktop: ['Show Desktop', DOT_SYSTEM], apps: ['Apps', DOT_SYSTEM],
 };
@@ -486,7 +487,15 @@ new ResizeObserver(() => trackpad.resize(pad.clientWidth, pad.clientHeight)).obs
 
 /** Where a touch is as the user sees it: turned with the Remote when it's upside down, so motion follows the thumb. */
 const point = (t) => unturn(t.clientX, t.clientY, { left: 0, top: 0, width: innerWidth, height: innerHeight }, turn);
-const touchesOf = (list) => Array.from(list, (t) => ({ id: t.identifier, ...point(t) }));
+
+/**
+ * Where touches are in a surface's own pixels, as the user sees it: turned with the Remote when it's
+ * upside down, so motion follows the thumb, and from the surface's corner, so the pad knows its edges.
+ */
+const touchesOf = (el, list) => {
+  const box = el.getBoundingClientRect();
+  return Array.from(list, (t) => ({ id: t.identifier, ...unturn(t.clientX, t.clientY, box, turn) }));
+};
 
 /**
  * Feeds a surface's touches to its gesture recognizer; motion is sent straight from touchmove. Its dot
@@ -496,7 +505,7 @@ function listen(el, recognizer, onCommands = () => {}, dots = null) {
   const handle = (phase) => (e) => {
     if (e.target.closest('button')) return; // the gear is a normal button
     e.preventDefault();
-    const commands = recognizer()[phase](touchesOf(e.targetTouches), e.timeStamp);
+    const commands = recognizer()[phase](touchesOf(el, e.targetTouches), e.timeStamp);
     onCommands(commands, e.targetTouches.length);
     dispatch(commands);
     dots?.feed(e, commands);

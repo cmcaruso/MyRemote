@@ -63,6 +63,7 @@ export const GESTURE = Object.freeze({
   pinchRatio: 0.2, // change in spread that makes a 4–5 finger pinch, and completes it
   complete: 0.25, // progress at release that completes a swipe
   flick: 0.002, // progress per ms at release, toward the Gesture, that completes it however far it got
+  edgePx: 32, // from the pad's right edge, where two fingers swiping left open Notification Center
 });
 
 const deg = (r) => (r * 180) / Math.PI;
@@ -70,8 +71,8 @@ const deg = (r) => (r * 180) / Math.PI;
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /**
- * Where the fingers are as a group: centroid, spread (mean distance from it) and the angle from the
- * first finger to the second, in id order so it doesn't flip.
+ * Where the fingers are as a group: centroid, spread (mean distance from it), the angle from the
+ * first finger to the second, in id order so it doesn't flip, and the right-hand finger's x.
  * @param {{ id: number, x: number, y: number }[]} touches
  */
 export function shape(touches) {
@@ -80,7 +81,8 @@ export function shape(touches) {
   const c = { x: list.reduce((sum, f) => sum + f.x, 0) / n, y: list.reduce((sum, f) => sum + f.y, 0) / n };
   const spread = list.reduce((sum, f) => sum + Math.hypot(f.x - c.x, f.y - c.y), 0) / n;
   const angle = n >= 2 ? Math.atan2(list[1].y - list[0].y, list[1].x - list[0].x) : 0;
-  return { c, spread, angle, n };
+  const right = Math.max(...list.map((f) => f.x));
+  return { c, spread, angle, n, right };
 }
 
 /**
@@ -99,6 +101,16 @@ export function classifyTwo(base, now, tp, slop) {
   if (tp.pinch && spread >= turn && spread >= travel / 2) return 'pinch';
   if (tp.rotate && turn > spread && turn >= travel / 2) return 'rotate';
   return travel > slop ? 'scroll' : null;
+}
+
+/**
+ * Whether two fingers scrolling from `base` to `now` swipe in from the pad's right edge, as for
+ * Notification Center: the right-hand one landed within 32 px of it and they move mostly left.
+ * @param {ReturnType<typeof shape>} base @param {ReturnType<typeof shape>} now @param {{ width: number }} pad
+ */
+export function fromRightEdge(base, now, pad) {
+  const dx = now.c.x - base.c.x, dy = now.c.y - base.c.y;
+  return base.right >= pad.width - GESTURE.edgePx && dx < 0 && Math.abs(dx) > Math.abs(dy);
 }
 
 /** A pinch's delta: the change in magnification, as AppKit uses it (0.04 = 4 % larger). */

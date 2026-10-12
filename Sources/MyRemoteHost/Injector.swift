@@ -213,6 +213,9 @@ final class Injector {
         case .dockAction(.spaceLeft): Keystrokes.press(.left, flags: .control).forEach(post)
         case .dockAction(.spaceRight): Keystrokes.press(.right, flags: .control).forEach(post)
         case let .dockAction(action): Dock.send(action)
+        case .notificationCenter: MenuBarClock.press()
+        // D's key code (kVK_ANSI_D): the system shortcut is registered by key, whatever the layout.
+        case .lookUp: Keystrokes.press(2, flags: [.control, .command]).forEach(post)
         }
     }
 

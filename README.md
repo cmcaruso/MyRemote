@@ -86,10 +86,12 @@ On the pad:
 - **Mission Control** and **App Exposé**: swipe up or down with three fingers (or four, as the Mac has it).
 - **Swipe between full-screen apps**: swipe left or right with the same fingers to move between Spaces.
 - **Show Desktop** and **Apps**: spread or pinch four or five fingers.
+- **Notification Center**: put two fingers at the pad's right edge and swipe left. It opens at once, and the same swipe closes it.
+- **Look up & data detectors**: tap with three fingers to look up the word under the pointer. It works this way even when the Mac looks up with Force Click, because a phone can't force-click.
 
 These follow your fingers as on the Mac: lift after a quarter of the way (half the pad's height or width is all the way), or flick, and it completes. Lift sooner and it springs back. A Gesture that's off on the Mac does nothing.
 
-The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Notification Center, Look up and three-finger drag are coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
+The dots turn purple for the app Gestures and green for the Dock ones, and the pad names the Gesture while it's on. The Remote waits 60 ms after your fingers land before deciding, and a Gesture keeps going until every finger is up. Three-finger drag is coming. While you type in **Keys**, iOS's three-finger undo, redo and paste are blocked, so they can't edit the Mac's text. The pointer pad in **Present** stays a plain trackpad, though its sideways scrolls can swipe between pages too, as any trackpad's do.
 
 ### Phone Mic
 
@@ -123,6 +125,7 @@ The room still hears the speakers a tenth to a fifth of a second after your own 
 - **Wi-Fi stutter.** With the Mac on Wi-Fi, the pointer can stall for about 100 ms a couple of times a second. The Mac's own Wi-Fi causes this, not the tailnet. A wired connection on the Mac avoids it.
 - **Networks that block Tailscale.** Some campus and office Wi-Fi blocks Tailscale, and the Remote can't reach the Mac. Put the iPhone on mobile data, or the Mac on a wired network, or both.
 - **Phone Mic in the background.** iOS doesn't let a web app use the microphone in the background, so keep the Remote open while you talk.
+- **Look up in some apps.** The Remote presses Look up's shortcut (⌃⌘D), since a real three-finger tap or force click can't be faked, so apps that ignore the shortcut don't look up. It works in Safari and TextEdit on macOS 26; Mail has been reported to ignore it.
 - **Dock Gestures on other macOS versions.** On macOS other than 26.x, Mission Control, App Exposé, Spaces, Show Desktop and Apps happen at once instead of following your fingers.
 - **Not included:** brightness control and a now-playing display. The Laser is tested over PowerPoint, Google Slides and Safari full screen, but not Keynote.
 
