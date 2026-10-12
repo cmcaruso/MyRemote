@@ -33,6 +33,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MyRemote"
 rsync -a --exclude test remote/ "$APP/Contents/Resources/remote/"
 sed "s/__BUNDLE_ID__/$BUNDLE_ID/" scripts/Info.plist > "$APP/Contents/Info.plist"
+cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
 
 codesign --force --sign "$IDENTITY" "$APP"
 if [ "$IDENTITY" = "-" ]; then
