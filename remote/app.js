@@ -341,12 +341,13 @@ function setPadEffect(value) {
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const DOT_REST = [235, 235, 245];
 const DOT_LIT = [10, 132, 255]; // --accent
-/** Lit dots take an app Gesture's colour (pinch, rotate, smart zoom) or a system one's (the Dock Gestures). */
+/** Lit dots take an app Gesture's colour (pinch, rotate, smart zoom, pages) or a system one's (the Dock Gestures). */
 const DOT_APP = [191, 90, 242];
 const DOT_SYSTEM = [48, 209, 88];
 /** What the pad says when a Gesture starts, and its colour. */
 const GESTURE_LABELS = {
   pinch: ['Zoom', DOT_APP], rotate: ['Rotate', DOT_APP], smartZoom: ['Smart zoom', DOT_APP],
+  pageBack: ['Back', DOT_APP], pageForward: ['Forward', DOT_APP],
   missionControl: ['Mission Control', DOT_SYSTEM], appExpose: ['App Exposé', DOT_SYSTEM],
   spaces: ['Full-screen apps', DOT_SYSTEM], showDesktop: ['Show Desktop', DOT_SYSTEM], apps: ['Apps', DOT_SYSTEM],
 };

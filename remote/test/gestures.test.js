@@ -142,6 +142,15 @@ test('three fingers swipe once they travel 30 px, each way to its Gesture', () =
   assert.equal(classifyMany(three(), three(-35, 5), on), 'spaces');
 });
 
+test('three fingers sideways swipe between pages when the Mac uses three for that', () => {
+  const pages = tp({ pages: '3', spaces: 4 });
+  assert.equal(classifyMany(three(), three(35, 5), pages), 'pages');
+  assert.equal(classifyMany(three(), three(-35, 5), tp({ pages: '2or3', spaces: 4 })), 'pages');
+  assert.equal(classifyMany(three(), three(0, -35), pages), 'missionControl'); // up is still Mission Control
+  assert.equal(classifyMany(three(), three(35, 5), tp({ pages: '2', spaces: 0 })), null); // two fingers only
+  assert.equal(classifyMany(four(40), four(40, 40), pages), 'spaces');
+});
+
 test('a swipe for a finger count the Mac does not use is nothing', () => {
   assert.equal(classifyMany(four(40), four(40, 0, -40), tp()), null); // swipes take three
   assert.equal(classifyMany(four(40), four(40, 0, -40), tp({ missionControl: 4 })), 'missionControl');
@@ -161,6 +170,7 @@ test('progress is half the pad for a swipe, and half the spread again for a pinc
   close(dockProgress('missionControl', three(), three(0, -100), pad, 0), 0.5);
   close(dockProgress('appExpose', three(), three(0, 100), pad, 0), 0.5);
   close(dockProgress('spaces', three(), three(-75, 0), pad, 0), -0.5);
+  close(dockProgress('pages', three(), three(75, 0), pad, 0), 0.5);
   const s = four(60).spread;
   close(dockProgress('apps', four(60), four(45), pad, s), 0.5);
   close(dockProgress('showDesktop', four(60), four(75), pad, s), 0.5);
@@ -177,4 +187,6 @@ test('a Dock Gesture completes at a quarter, 20 % spread for a pinch, or on a fl
   assert.equal(completes('spaces', -0.3, 0), true);
   assert.equal(completes('spaces', -0.1, -0.003), true);
   assert.equal(completes('spaces', -0.1, 0.003), false); // flicked back toward where it started
+  assert.equal(completes('pages', -0.3, 0), true);
+  assert.equal(completes('pages', 0.1, 0.003), true);
 });

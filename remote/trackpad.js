@@ -62,8 +62,8 @@ export function createTrackpad(params = {}) {
 
   /**
    * idle | one (one finger) | two (two fingers, undecided) | scroll | pinch | rotate | many (three or more
-   * fingers, undecided) | dock (a Dock Gesture) | done (wait for all fingers up). Pinch, rotate, many and
-   * dock come only with the Mac's settings.
+   * fingers, undecided) | dock (a Dock Gesture, or a three-finger page swipe) | done (wait for all fingers
+   * up). Pinch, rotate, many and dock come only with the Mac's settings.
    */
   let mode = 'idle';
   let start = null; // first finger at touch-down: { x, y, t }
@@ -79,7 +79,9 @@ export function createTrackpad(params = {}) {
   let base = null; // the two fingers' shape when they landed, or when the Gesture last moved
   let lastTwoTap = null; // end of the last two-finger tap, for smart zoom
   let countAt = 0; // when the finger count last changed, while three or more are undecided
-  let dock = null; // the Dock Gesture under way: { g, last (shape), progress, spread (where a pinch began) }
+  // The Gesture under way: { g, last (shape), progress, spread (where a pinch began) }. A page swipe
+  // ('pages') sends nothing until the fingers lift, then goes back or forward once.
+  let dock = null;
   const dockFlick = createFlick({ momentum: true }); // its progress per ms, for a flick
   let size = { width: 320, height: 400 }; // the pad's, in px: a swipe's progress is relative to it
 
@@ -92,7 +94,7 @@ export function createTrackpad(params = {}) {
     if (d === 0) return [];
     dock.progress += d;
     dockFlick.add(t, d, 0);
-    return [{ t: 'g', g: dock.g, d }];
+    return dock.g === 'pages' ? [] : [{ t: 'g', g: dock.g, d }];
   }
 
   return {
@@ -235,7 +237,10 @@ export function createTrackpad(params = {}) {
         mode = left ? 'done' : 'idle';
       } else if (mode === 'dock') {
         if (left === 0) {
-          out.push({ t: 'ge', g: dock.g, ok: completes(dock.g, dock.progress, dockFlick.release(t).vx) });
+          const ok = completes(dock.g, dock.progress, dockFlick.release(t).vx);
+          // Fingers to the right go back, as on the Mac.
+          if (dock.g !== 'pages') out.push({ t: 'ge', g: dock.g, ok });
+          else if (ok) out.push({ t: 'ga', a: dock.progress > 0 ? 'pageBack' : 'pageForward' });
           dock = null;
           mode = 'idle';
         }

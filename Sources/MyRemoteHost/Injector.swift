@@ -189,6 +189,21 @@ final class Injector {
         event.setIntegerValueField(.scrollWheelEventScrollPhase, value: scroll.phase.rawValue)
         event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: scroll.momentum.rawValue)
         event.post(tap: .cghidEventTap)
+        if let gesture = scroll.gesture { postGestureScroll(gesture, phase: scroll.phase) }
+    }
+
+    /// The gesture-scroll event that goes with a scroll while the fingers are down: type 29, subtype 6
+    /// (`kIOHIDEventTypeScroll`), deltas in fields 116 and 119 (docs/adr/0001).
+    private func postGestureScroll(_ delta: (dx: Double, dy: Double), phase: ScrollEvent.Phase) {
+        guard let event = CGEvent(source: source) else { return }
+        let field = { (n: UInt32) in unsafeBitCast(n, to: CGEventField.self) }
+        event.type = unsafeBitCast(UInt32(29), to: CGEventType.self)
+        event.setIntegerValueField(field(110), value: 6)
+        // A trackpad sends −0 for no motion.
+        event.setDoubleValueField(field(116), value: delta.dx == 0 ? -0.0 : delta.dx)
+        event.setDoubleValueField(field(119), value: delta.dy == 0 ? -0.0 : delta.dy)
+        event.setIntegerValueField(field(132), value: phase.rawValue)
+        event.post(tap: .cghidEventTap)
     }
 
     private func post(_ output: GestureOutput) {
@@ -289,6 +304,10 @@ final class Injector {
             event.setDoubleValueField(field(114), value: degrees)
         case .smartZoom:
             subtype = 22 // kIOHIDEventTypeZoomToggle
+        case let .pageSwipe(back):
+            subtype = 16 // kIOHIDEventTypeNavigationSwipe
+            // The direction on Began (kIOHIDSwipeLeft 4 goes back, Right 8 forward), none on Ended.
+            event.setIntegerValueField(field(115), value: gesture.phase == .began ? (back ? 4 : 8) : 0)
         }
         event.setIntegerValueField(field(110), value: subtype)
         event.setIntegerValueField(field(132), value: gesture.phase.rawValue)

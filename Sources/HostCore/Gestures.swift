@@ -15,6 +15,8 @@ public struct GestureEvent: Equatable, Sendable {
         /// Degrees, counter-clockwise positive, as AppKit's `rotation`.
         case rotate(Double)
         case smartZoom
+        /// Swipe between pages: back or forward, a Began with the direction then an Ended.
+        case pageSwipe(back: Bool)
     }
 
     /// `CGGesturePhase` values; a one-shot has none.
@@ -115,6 +117,9 @@ public struct Gestures: Sendable {
             return [.dockAction(action)]
         case .gestureAction(.smartZoom):
             return [.event(GestureEvent(.smartZoom, phase: .none))]
+        case let .gestureAction(action) where action == .pageBack || action == .pageForward:
+            let kind = GestureEvent.Kind.pageSwipe(back: action == .pageBack)
+            return [.event(GestureEvent(kind, phase: .began)), .event(GestureEvent(kind, phase: .ended))]
         default:
             return []
         }

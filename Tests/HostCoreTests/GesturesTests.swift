@@ -63,6 +63,15 @@ struct GesturesTests {
         #expect(gestures.apply(.gestureAction(.smartZoom)) == [event(.smartZoom, .none)])
     }
 
+    @Test(arguments: [true, false])
+    func aPageSwipeBeginsWithItsDirectionAndEnds(_ followsFingers: Bool) {
+        var gestures = Gestures(followsFingers: followsFingers)
+        #expect(gestures.apply(.gestureAction(.pageBack)) == [event(.pageSwipe(back: true), .began),
+                                                               event(.pageSwipe(back: true), .ended)])
+        #expect(gestures.apply(.gestureAction(.pageForward)) == [event(.pageSwipe(back: false), .began),
+                                                                  event(.pageSwipe(back: false), .ended)])
+    }
+
     @Test func otherCommandsPostNothing() {
         var gestures = Gestures(followsFingers: true)
         #expect(gestures.apply(.move(dx: 1, dy: 1)) == [])
