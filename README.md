@@ -142,7 +142,7 @@ The room still hears the speakers a tenth to a fifth of a second after your own 
 
 ## Privacy
 
-MyRemote has no account, no telemetry and no server of its own: the Remote talks only to the Host on your Mac, through your tailnet. The Host keeps one file, `~/Library/Application Support/MyRemote/remotes.json`, readable only by you, with each paired Remote's name, the Tailscale login it paired under, when it paired and was last used, and a hash of its token. Revoking a Remote deletes its entry. The Phone Mic is streamed live to the output you pick and never recorded.
+MyRemote has no account, no telemetry and no server of its own: the Remote talks only to the Host on your Mac, through your tailnet. The Host keeps one file, `~/Library/Application Support/MyRemote/remotes.json`, readable only by you, with each paired Remote's name, the Tailscale login it paired under, when it paired and was last used, and a hash of its token. Revoking a Remote deletes its entry. The Phone Mic is streamed live to the output you pick and never recorded. The downloaded app's one connection beyond your tailnet is the daily update check: an HTTPS request to GitHub for the latest Release's `appcast.xml`, which tells GitHub your IP address and MyRemote's version. A build from source doesn't check.
 
 ## Known limitations
 
