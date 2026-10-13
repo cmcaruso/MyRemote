@@ -76,10 +76,12 @@ final class Injector {
         }
     }
 
-    /// A Remote went away: never leave the button stuck down or the page coasting.
+    /// A Remote went away: never leave the button stuck down, a scroll open or the page coasting.
     func remoteLeft() {
         release()
-        stopMomentum()
+        momentum?.cancel()
+        momentum = nil
+        scroller.cancel().forEach(post)
         gestures.cancel().forEach(post)
         switcher.releaseNow().forEach(post)
     }
@@ -180,7 +182,7 @@ final class Injector {
 
     private func post(_ scroll: ScrollEvent) {
         guard let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
-                                  wheel1: Int32(scroll.dy), wheel2: Int32(scroll.dx), wheel3: 0) else { return }
+                                  wheel1: Int32(clamping: scroll.dy), wheel2: Int32(clamping: scroll.dx), wheel3: 0) else { return }
         event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
         event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(scroll.dy))
         event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(scroll.dx))

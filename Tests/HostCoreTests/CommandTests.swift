@@ -66,9 +66,28 @@ struct CommandTests {
         #"{"t":"g","g":"pinch"}"#,    // Gesture without a delta
         #"{"t":"ge","g":"pinch"}"#,   // end without ok
         #"{"t":"ga","a":"undo"}"#,    // unknown action
+        #"{"t":"c","b":0,"n":4}"#,    // more clicks than a triple-click
+        #"{"t":"tx","bs":4097,"s":""}"#, // too many Backspaces for one frame
+        #"{"t":"tx","bs":9223372036854775807,"s":""}"#,
+        #"{"t":"m","dx":1e400,"dy":0}"#, // beyond a Double: infinite
+        #"{"t":"se","vx":-1e400,"vy":0}"#,
+        #"{"t":"g","g":"pinch","d":1e400}"#,
     ])
     func ignoresFramesItDoesNotUnderstand(_ text: String) {
         #expect(Command(decoding: text) == nil)
+    }
+
+    @Test(arguments: [
+        (#"{"t":"m","dx":1e100,"dy":-1e100}"#, Command.move(dx: 10_000, dy: -10_000)),
+        (#"{"t":"s","dx":3000000000,"dy":0}"#, .scroll(dx: 10_000, dy: 0)),
+        (#"{"t":"l","dx":-20000,"dy":9999}"#, .laserMove(dx: -10_000, dy: 9999)),
+        (#"{"t":"se","vx":1e9,"vy":-1e9}"#, .scrollEnd(vx: 50, vy: -50)),
+        (#"{"t":"g","g":"pinch","d":1e9}"#, .gesture(.pinch, delta: 10)),
+        (#"{"t":"g","g":"rotate","d":-1e9}"#, .gesture(.rotate, delta: -180)),
+        (#"{"t":"tx","bs":4096,"s":""}"#, .type(backspaces: 4096, text: "")),
+    ])
+    func clampsHugeNumbersToWhatAnEventCanCarry(_ text: String, _ expected: Command) {
+        #expect(Command(decoding: text) == expected)
     }
 
     @Test(arguments: [(-0.2, 0.0), (1.7, 1.0), (0.0, 0.0), (1.0, 1.0)])

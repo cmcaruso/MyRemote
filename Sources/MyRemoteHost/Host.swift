@@ -38,6 +38,8 @@ final class Host {
     private var lastVolume: String?
     /// The last Mac trackpad settings pushed; one change in System Settings signals several times.
     private var lastTrackpad: String?
+    /// The connection that sent the last command, so it holds any drag, Gesture or Laser in progress.
+    private var driver: UUID?
 
     init() {
         let configured = UserDefaults.standard.integer(forKey: "port")
@@ -60,20 +62,8 @@ final class Host {
         if !accessibilityGranted {
             // On first launch Setup asks for it in its turn, rather than macOS's prompt covering Setup.
             if !opensSetupAtLaunch { _ = CGRequestPostEventAccess() }
-            watchAccessibility()
         }
-
-        // Every command from every Remote goes through this stream to the main actor.
-        let (commands, continuation) = AsyncStream.makeStream(of: Command.self)
-        Task {
-            for await command in commands {
-                switch command {
-                case let .setVolume(level): volume.set(level)
-                case .laserStart, .laserMove, .laserEnd: laser.apply(command)
-                default: injector.apply(command)
-                }
-            }
-        }
+        watchAccessibility()
 
         // Keep every Remote's volume slider in step with the Mac.
         volume.onChange = { [weak self] in self?.pushVolume() }
@@ -83,16 +73,22 @@ final class Host {
         let server = Server(
             remoteDirectory: Self.remoteDirectory(),
             port: port,
-            commands: continuation,
+            onCommand: { [weak self] connection, command in
+                await MainActor.run { self?.handle(command, from: connection) }
+            },
             clients: clients,
             pairings: pairings,
-            onRemote: { [weak self] delta in
+            onRemote: { [weak self] connection, joined in
                 await MainActor.run {
                     guard let self else { return }
-                    self.remotes += delta
-                    if delta < 0 {
-                        self.injector.remoteLeft()
-                        self.laser.end()
+                    self.remotes += joined ? 1 : -1
+                    if !joined {
+                        // Only the Remote that was driving let go; another one's drag or Laser carries on.
+                        if self.driver == connection.id {
+                            self.driver = nil
+                            self.injector.remoteLeft()
+                            self.laser.end()
+                        }
                     } else {
                         self.pushVolume(force: true)
                         self.pushTrackpad(force: true)
@@ -116,6 +112,18 @@ final class Host {
         }
 
         watchStatus()
+    }
+
+    /// Every command from every Remote crosses onto the main actor here.
+    private func handle(_ command: Command, from connection: Connection) {
+        // A Remote revoked while this command was on its way doesn't get it run.
+        guard pairings.isPaired(connection.remote) else { return }
+        driver = connection.id
+        switch command {
+        case let .setVolume(level): volume.set(level)
+        case .laserStart, .laserMove, .laserEnd: laser.apply(command)
+        default: injector.apply(command)
+        }
     }
 
     /// Serve and the login item change outside the Host (Terminal, System Settings), so look again now and then.
@@ -218,11 +226,12 @@ final class Host {
         AXIsProcessTrusted() || CGPreflightPostEventAccess()
     }
 
-    /// Accessibility is granted in System Settings while the Host runs; notice it without a restart.
+    /// Accessibility is granted, or taken away, in System Settings while the Host runs; notice it without a
+    /// restart. Quickly while it's missing, now and then once it's there.
     private func watchAccessibility() {
         Task {
-            while !accessibilityGranted {
-                try? await Task.sleep(for: .seconds(2))
+            while true {
+                try? await Task.sleep(for: .seconds(accessibilityGranted ? 10 : 2))
                 accessibilityGranted = Self.canPostEvents()
             }
         }

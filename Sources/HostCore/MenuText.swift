@@ -29,8 +29,12 @@ public enum MenuText {
         case let .serving(url, funnel):
             let address = MenuLine("Remote at \(url)", copy: .init(label: "Copy Remote Address", text: url))
             guard funnel else { return [address] }
+            // Turns Funnel off on the Remote's HTTPS port only (which drops that port's serve too), then
+            // serves the Host there again, on the tailnet alone. Other ports' serve and Funnel stay as they are.
+            let https = URL(string: url)?.port ?? 443
+            let serveAgain = https == 443 ? serveCommand : "tailscale serve --bg --https=\(https) \(port)"
             return [address, MenuLine("Funnel is on: the Remote's address is public on the internet",
-                                      copy: command("tailscale serve reset && \(serveCommand)"))]
+                                      copy: command("tailscale funnel --https=\(https) off && \(serveAgain)"))]
         case .notServing:
             return [MenuLine("tailscale serve doesn't reach the Host", copy: command(serveCommand))]
         case let .unknown(reason):

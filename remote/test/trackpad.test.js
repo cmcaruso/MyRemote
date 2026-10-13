@@ -418,3 +418,55 @@ test('without the Mac trackpad settings, a pinch is just two fingers, as in v1',
   same(pad.move(pair(60), 70), []);
   same(pad.end([], 100), [{ t: 'c', b: 1, n: 1 }]);
 });
+
+// ---------- iOS cancelling the touches ----------
+
+test('a cancelled quick tap clicks nothing, and starts no double-click', () => {
+  const pad = createTrackpad();
+  tap(pad, 0);
+  pad.start([finger(50, 50)], 150);
+  same(pad.cancel([], 200), []);
+  pad.start([finger(50, 50)], 250);
+  same(pad.end([], 300), [{ t: 'c', b: 0, n: 1 }]); // a fresh single click, not the second of a double
+});
+
+test('a cancelled drag lets go of the button', () => {
+  const pad = createTrackpad();
+  pad.start([finger(0, 0)], 0);
+  pad.move([finger(1, 0)], 300);
+  pad.move([finger(20, 0)], 400);
+  same(pad.cancel([], 450), [{ t: 'u' }]);
+});
+
+test('a cancelled two-finger tap right-clicks nothing', () => {
+  const pad = createTrackpad();
+  pad.start([finger(0, 0)], 0);
+  pad.start([finger(0, 0), finger(40, 0, 2)], 5);
+  same(pad.cancel([], 60), []);
+});
+
+test('a cancelled pinch ends without completing', () => {
+  const pad = twoDown();
+  pad.move(pair(60), 70);
+  pad.move(pair(66), 80);
+  same(pad.cancel([], 100), [{ t: 'ge', g: 'pinch', ok: false }]);
+  same(pad.end([], 120), []); // nothing left to end
+});
+
+test('a cancelled scroll ends without coasting', () => {
+  const pad = createTrackpad();
+  pad.start([finger(0, 0)], 0);
+  pad.start([finger(0, 0), finger(40, 0, 2)], 5);
+  pad.move([finger(0, 20), finger(40, 20, 2)], 80);
+  pad.move([finger(0, 60), finger(40, 60, 2)], 96);
+  same(pad.cancel([], 100), [{ t: 'se', vx: 0, vy: 0 }]);
+});
+
+test('the scroll strip ends a cancelled scroll without coasting', () => {
+  const strip = createScrollStrip();
+  strip.start([finger(0, 0)], 0);
+  strip.move([finger(0, 30)], 16);
+  strip.move([finger(0, 60)], 32);
+  same(strip.cancel([], 40), [{ t: 'se', vx: 0, vy: 0 }]);
+  same(strip.cancel([], 50), []);
+});

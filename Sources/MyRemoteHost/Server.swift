@@ -41,15 +41,23 @@ actor Clients {
     }
 }
 
+/// One Remote's control socket: the commands it sends, and the input it holds, are its own.
+struct Connection: Hashable, Sendable {
+    let id: UUID
+    let remote: Pairing.Remote.ID
+}
+
 /// Serves the Remote and its WebSocket on loopback; `tailscale serve` adds HTTPS and the tailnet.
 struct Server: Sendable {
     let remoteDirectory: String
     let port: Int
-    let commands: AsyncStream<Command>.Continuation
+    /// Runs one command. The socket reads its next frame only once this returns, so a Remote that sends
+    /// faster than the Mac keeps up waits in its own socket (and merges its motion) rather than in a queue.
+    let onCommand: @Sendable (Connection, Command) async -> Void
     let clients: Clients
     let pairings: PairingStore
-    /// Called with +1 when a Remote connects (after it can receive broadcasts) and -1 when it leaves.
-    let onRemote: @Sendable (Int) async -> Void
+    /// Called with true when a Remote connects (after it can receive broadcasts) and false when it leaves.
+    let onRemote: @Sendable (Connection, Bool) async -> Void
     /// Where the Phone Mic's samples go, straight from the network.
     let mic: MicFeed
     /// Called with a Phone Mic stream and its sample rate when it starts, and nil when it ends.
@@ -59,7 +67,7 @@ struct Server: Sendable {
     static let unpairedCloseCode: WebSocketErrorCode = .unknown(4401)
 
     func run() async throws {
-        let commands = commands
+        let onCommand = onCommand
         let clients = clients
         let pairings = pairings
         let onRemote = onRemote
@@ -97,8 +105,10 @@ struct Server: Sendable {
             guard let remote = try await Self.pairedRemote(context.request, pairings, outbound) else { return }
             let (outbox, continuation) = AsyncStream.makeStream(of: Outgoing.self)
             let id = await clients.add(continuation, remote: remote.id)
-            await onRemote(1)
-            defer { Task { await clients.remove(id); await onRemote(-1) } }
+            guard try await Self.stillPaired(remote, pairings, clients, id, outbound) else { return }
+            let connection = Connection(id: id, remote: remote.id)
+            await onRemote(connection, true)
+            defer { Task { await clients.remove(id); await onRemote(connection, false) } }
 
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -114,7 +124,7 @@ struct Server: Sendable {
                 }
                 for try await message in inbound.messages(maxSize: 1 << 16) {
                     guard case let .text(text) = message, let command = Command(decoding: text) else { continue }
-                    commands.yield(command)
+                    await onCommand(connection, command)
                 }
                 group.cancelAll()
             }
@@ -132,6 +142,7 @@ struct Server: Sendable {
             }
             let (outbox, continuation) = AsyncStream.makeStream(of: Outgoing.self)
             let id = await clients.add(continuation, remote: remote.id, kind: .mic)
+            guard try await Self.stillPaired(remote, pairings, clients, id, outbound) else { return }
             mic.begin(id, rate: rate)
             await onMic(id, rate)
             defer {
@@ -182,6 +193,16 @@ struct Server: Sendable {
             try await outbound.close(unpairedCloseCode, reason: "\(refusal)")
             return nil
         }
+    }
+
+    /// Whether `remote` is still paired now that its socket can hear a revocation. One revoked between
+    /// `pairedRemote` and joining `clients` missed the revocation's broadcast, so it's closed here instead.
+    private static func stillPaired(_ remote: Pairing.Remote, _ pairings: PairingStore, _ clients: Clients,
+                                    _ id: UUID, _ outbound: WebSocketOutboundWriter) async throws -> Bool {
+        guard await !pairings.isPaired(remote.id) else { return true }
+        await clients.remove(id)
+        try await outbound.close(unpairedCloseCode, reason: "notPaired")
+        return false
     }
 
     private struct PairBody: Decodable {

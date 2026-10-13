@@ -10,6 +10,9 @@ final class PairingStore {
     /// Why the last code stopped working early (too many wrong tries), for the pairing window.
     private(set) var codeDied = false
     private(set) var saveError: String?
+    /// A revocation the file doesn't have yet: it holds while the Host runs, but restarting now would
+    /// bring the Remote back. Every later save tries again.
+    private(set) var unsavedRevocation = false
 
     private let file: URL
 
@@ -54,23 +57,32 @@ final class PairingStore {
         return decision
     }
 
+    func isPaired(_ id: Pairing.Remote.ID) -> Bool {
+        pairing.remotes.contains { $0.id == id }
+    }
+
     func unpair(_ request: Pairing.Request) -> Pairing.Remote? {
         let remote = pairing.unpair(request)
-        if remote != nil { save() }
+        if remote != nil { saveRevocation() }
         return remote
     }
 
     func revoke(_ id: Pairing.Remote.ID) {
         pairing.revoke(id)
-        save()
+        saveRevocation()
     }
 
     func revokeAll() {
         pairing.revokeAll()
-        save()
+        saveRevocation()
     }
 
-    private func save() {
+    private func saveRevocation() {
+        if !save() { unsavedRevocation = true }
+    }
+
+    @discardableResult
+    private func save() -> Bool {
         do {
             let directory = file.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
@@ -78,8 +90,11 @@ final class PairingStore {
             try pairing.saved().write(to: file, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path(percentEncoded: false))
             saveError = nil
+            unsavedRevocation = false
+            return true
         } catch {
             saveError = error.localizedDescription
+            return false
         }
     }
 }

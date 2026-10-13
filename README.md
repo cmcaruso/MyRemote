@@ -41,6 +41,8 @@ Download it, or build it from source.
 
 When you update to a new version, macOS asks for Accessibility again: the switch may still look on, so remove MyRemote from the list with **−** and turn on the new one when macOS asks.
 
+Each release's DMG is built from the commit tagged with its version (`v1.2.0` and so on), and the release page links that tag's source.
+
 #### Build from source
 
 ```sh
@@ -135,9 +137,13 @@ Turn it off under ⚙ → Present → Echo guard. Keep the phone at your mouth, 
 
 The room still hears the speakers a tenth to a fifth of a second after your own voice, because the sound travels over the network. Wireless microphones are near instant. Up close, the room mostly hears you directly. At the back, the speakers carry you, but the delay can sound like a slap-back echo. The delay is shortest with the phone and the Mac on the same network, and longest on mobile data.
 
+## Privacy
+
+MyRemote has no account, no telemetry and no server of its own: the Remote talks only to the Host on your Mac, through your tailnet. The Host keeps one file, `~/Library/Application Support/MyRemote/remotes.json`, readable only by you, with each paired Remote's name, the Tailscale login it paired under, when it paired and was last used, and a hash of its token. Revoking a Remote deletes its entry. The Phone Mic is streamed live to the output you pick and never recorded.
+
 ## Known limitations
 
-- **Reconnecting.** The Remote reconnects a second after it loses the Host. If it seems stuck after the phone or the Mac slept, close the Home Screen app and open it again.
+- **Reconnecting.** The Remote reconnects a second after it loses the Host. If it seems stuck after the phone or the Mac slept, close the Home Screen app and open it again. While it's away, Keyboard Mode doesn't take typing, so nothing is lost or typed twice when it's back.
 - **Wi-Fi stutter.** With the Mac on Wi-Fi, the pointer can stall for about 100 ms a couple of times a second. The Mac's own Wi-Fi causes this, not the tailnet. A wired connection on the Mac avoids it.
 - **Networks that block Tailscale.** Some campus and office Wi-Fi blocks Tailscale, and the Remote can't reach the Mac. Put the iPhone on mobile data, or the Mac on a wired network, or both.
 - **Phone Mic in the background.** iOS doesn't let a web app use the microphone in the background, so keep the Remote open while you talk.
@@ -172,6 +178,6 @@ The layout:
 
 MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
 
-The Remote's icons and the app icon come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
+The Remote's icons and the app icon come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The Host is built on [Hummingbird](https://github.com/hummingbird-project/hummingbird), [SwiftNIO](https://github.com/apple/swift-nio) and other Swift packages under the Apache License 2.0; the app carries each one's licence and NOTICE in `MyRemote.app/Contents/Resources/Licenses`. The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
 
 MyRemote is an independent project, not affiliated with or endorsed by Apple or Tailscale. Mac, macOS, iPhone, iOS, Safari and the other Apple product names are trademarks of Apple Inc., and Tailscale is a trademark of Tailscale Inc.; they're used here only to say what MyRemote works with.

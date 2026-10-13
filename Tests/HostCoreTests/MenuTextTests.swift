@@ -21,9 +21,15 @@ struct MenuTextTests {
         let lines = MenuText.serve(.serving(url: "https://mac.example.ts.net", funnel: true), port: 8484)
         #expect(lines.dropFirst() == [
             MenuLine("Funnel is on: the Remote's address is public on the internet",
-                     copy: .init(label: "Copy Command: tailscale serve reset && tailscale serve --bg 8484",
-                                 text: "tailscale serve reset && tailscale serve --bg 8484")),
+                     copy: .init(label: "Copy Command: tailscale funnel --https=443 off && tailscale serve --bg 8484",
+                                 text: "tailscale funnel --https=443 off && tailscale serve --bg 8484")),
         ])
+    }
+
+    @Test func turnsFunnelOffOnlyOnTheRemotesOwnPort() {
+        let lines = MenuText.serve(.serving(url: "https://mac.example.ts.net:8443", funnel: true), port: 8484)
+        #expect(lines.last?.copy?.text
+            == "tailscale funnel --https=8443 off && tailscale serve --bg --https=8443 8484")
     }
 
     @Test func saysWhyItCannotTellWhetherServeReachesTheHost() {

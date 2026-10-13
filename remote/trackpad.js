@@ -293,6 +293,28 @@ export function createTrackpad(params = {}) {
       }
       return out;
     },
+
+    /**
+     * iOS took the touches away (a system gesture, an alert): let go of whatever is held, and do nothing
+     * the fingers didn't finish: no click, no Gesture completing, no coasting.
+     * @param {Touch[]} touches any touches iOS left down @param {number} t
+     */
+    cancel(touches, t) {
+      const out = [];
+      if ((mode === 'one' && dragging) || mode === 'drag3') out.push({ t: 'u' });
+      else if (mode === 'pinch' || mode === 'rotate') out.push({ t: 'ge', g: mode, ok: false });
+      else if (mode === 'dock' && dock.g !== 'pages') out.push({ t: 'ge', g: dock.g, ok: false });
+      else if (mode === 'scroll') out.push({ t: 'se', vx: 0, vy: 0 });
+      flick.release(t);
+      dockFlick.release(t);
+      dragging = false;
+      held = null;
+      dock = null;
+      lastTap = null;
+      lastTwoTap = null;
+      mode = touches.length ? 'done' : 'idle';
+      return out;
+    },
   };
 }
 
@@ -322,6 +344,13 @@ export function createScrollStrip(params = {}) {
       if (y === null || touches.length > 0) return [];
       y = null;
       return [{ t: 'se', ...flick.release(t) }];
+    },
+    /** iOS took the touch away: end the scroll without coasting. */
+    cancel(touches, t) {
+      if (y === null) return [];
+      y = null;
+      flick.release(t);
+      return [{ t: 'se', vx: 0, vy: 0 }];
     },
   };
 }

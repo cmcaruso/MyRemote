@@ -67,4 +67,23 @@ struct ScrollerTests {
         #expect(scroller.momentumFrame() == nil)
         #expect(scroller.stop() == [])
     }
+
+    @Test func cancellingEndsAnOpenScrollSoTheNextOneBeginsAgain() {
+        var scroller = Scroller()
+        #expect(scroller.scroll(dx: 0, dy: -12).phase == .began)
+
+        #expect(scroller.cancel() == [ScrollEvent(dx: 0, dy: 0, phase: .ended),
+                                      ScrollEvent(dx: 0, dy: 0, momentum: .end)])
+        #expect(scroller.scroll(dx: 0, dy: -12).phase == .began)
+    }
+
+    @Test func cancellingStopsTheCoast() {
+        var scroller = Scroller()
+        _ = scroller.scroll(dx: 0, dy: -12)
+        _ = scroller.end(vx: 0, vy: -1.2)
+
+        #expect(scroller.cancel() == [ScrollEvent(dx: 0, dy: 0, momentum: .end)])
+        #expect(scroller.momentumFrame() == nil)
+        #expect(scroller.cancel() == [])
+    }
 }
