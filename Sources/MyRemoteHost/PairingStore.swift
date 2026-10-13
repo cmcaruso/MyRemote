@@ -54,6 +54,10 @@ final class PairingStore {
         return decision
     }
 
+    func isPaired(_ id: Pairing.Remote.ID) -> Bool {
+        pairing.remotes.contains { $0.id == id }
+    }
+
     func unpair(_ request: Pairing.Request) -> Pairing.Remote? {
         let remote = pairing.unpair(request)
         if remote != nil { save() }
