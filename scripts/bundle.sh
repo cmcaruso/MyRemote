@@ -8,6 +8,11 @@
 # and Intel, and MYREMOTE_OUT puts it in another folder than build/, as scripts/dmg.sh does for a
 # release.
 #
+# MYREMOTE_UPDATES=1 turns on updates from GitHub Releases (Sparkle), as scripts/dmg.sh does: it sets
+# the feed and the public key that checks each update and the feed itself (MYREMOTE_FEED_URL sets
+# another feed, to try an update locally). Other builds don't update themselves, so a
+# build from source never replaces itself with the published DMG.
+#
 # Signing is ad hoc by default. macOS ties the Accessibility grant to the signature, which an ad-hoc
 # build changes every time, so each rebuild needs the grant again (--run resets the stale entry so
 # macOS asks cleanly). If you rebuild the app often, sign with a stable identity of your own by
@@ -39,10 +44,27 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/MyRemote"
 rsync -a --exclude test remote/ "$APP/Contents/Resources/remote/"
 sed "s/__BUNDLE_ID__/$BUNDLE_ID/" scripts/Info.plist > "$APP/Contents/Info.plist"
+if [ "${MYREMOTE_UPDATES:-}" = 1 ]; then
+  PLIST="$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :SUFeedURL string ${MYREMOTE_FEED_URL:-https://github.com/cmcaruso/MyRemote/releases/latest/download/appcast.xml}" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $(cat scripts/sparkle-public-key)" "$PLIST"
+  # The feed is signed with the same key, so its text and links can't be changed either. Sparkle then
+  # also wants each update checked before it's unpacked.
+  /usr/libexec/PlistBuddy -c "Add :SURequireSignedFeed bool true" -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$PLIST"
+fi
+# Sparkle, without its XPC services: only a sandboxed app needs them.
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" \
+  "$APP/Contents/Frameworks/Sparkle.framework/XPCServices"
 cp LICENSE THIRD_PARTY_NOTICES.md scripts/AppIcon.icns "$APP/Contents/Resources/"
 # The Swift packages' own licences and NOTICE files, which their Apache License asks every copy to carry.
 scripts/licenses.sh "$APP/Contents/Resources/Licenses"
 
+# Inside out, without --deep: Sparkle's helpers, the framework, then the app.
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+codesign --force --sign "$IDENTITY" "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app"
+codesign --force --sign "$IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign "$IDENTITY" "$APP"
 if [ "$IDENTITY" = "-" ]; then
   echo "Built $APP ($BUNDLE_ID, signed ad hoc: grant Accessibility again after this rebuild)"

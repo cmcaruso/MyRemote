@@ -64,10 +64,16 @@ Inc. and the SwiftNIO and Swift Server projects), CompressNIO (Adam Fowler) and 
 Hummingbird Project). SwiftNIO includes llhttp (MIT) and a SHA-1 implementation from FreeBSD (BSD), as
 its NOTICE says.
 
+The Host also embeds the Swift package [Sparkle](https://sparkle-project.org) (Sparkle.framework), which
+updates the Release build from GitHub Releases. Sparkle is under the MIT License, copyright Andy Matuschak, Elgato Systems,
+Kornel Lesiński, Mayur Pawashe and its other contributors; its LICENSE also carries the licences of the
+code it includes (bsdiff, sais-lite, ed25519 and others).
+
 `Package.resolved` pins the exact versions. `scripts/licenses.sh` copies every package's own LICENSE
 and NOTICE files into the app, at `MyRemote.app/Contents/Resources/Licenses`, with a list of the
 packages, their versions and where their source is. The Apache License 2.0 is at
-<https://www.apache.org/licenses/LICENSE-2.0> and in each package's folder there.
+<https://www.apache.org/licenses/LICENSE-2.0> and in each package's folder there, and Sparkle's licence
+in `Licenses/sparkle`.
 
 ## Mac Mouse Fix
 

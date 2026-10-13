@@ -8,7 +8,7 @@ struct MyRemoteApp: App {
 
     var body: some Scene {
         MenuBarExtra("MyRemote", systemImage: "hand.point.up.left") {
-            HostMenu(host: delegate.host)
+            HostMenu(host: delegate.host, updates: delegate.updates)
         }
         Window("Set Up MyRemote", id: SetupWindow.id) {
             SetupWindow(host: delegate.host)
@@ -29,6 +29,7 @@ struct MyRemoteApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let host = Host()
+    let updates = Updates()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // No Dock icon, also when run unbundled with `swift run` (the bundle sets LSUIElement).
@@ -39,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct HostMenu: View {
     let host: Host
+    let updates: Updates
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -98,6 +100,9 @@ struct HostMenu: View {
             Text("Launch at login works only in the built app")
         }
         Divider()
+        if updates.available {
+            Button("Check for Updates…") { updates.check() }.disabled(!updates.canCheck)
+        }
         Button("Quit MyRemote") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 

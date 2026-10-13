@@ -1,6 +1,7 @@
 #!/bin/sh
 # Copies the licence and NOTICE files of every Swift package MyRemote is built with into a folder, for
-# the app bundle: their Apache License 2.0 asks that every copy of the app carries them.
+# the app bundle: their licences (the Apache License 2.0, and Sparkle's MIT licence) ask that every copy
+# of the app carries them.
 #
 #   scripts/licenses.sh <folder>
 #
@@ -13,7 +14,8 @@ OUT="$1"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 {
-  echo "MyRemote is built with these Swift packages, all under the Apache License 2.0."
+  echo "MyRemote is built with these Swift packages, all under the Apache License 2.0 except Sparkle,"
+  echo "which is under the MIT License (its LICENSE also lists the licences of the code it includes)."
   echo "Each folder holds the package's own LICENSE and NOTICE files."
   echo
 } > "$OUT/README.txt"
