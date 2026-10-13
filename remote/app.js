@@ -73,7 +73,11 @@ const socketURL = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://
 function connect() {
   const socket = new WebSocket(socketURL('/ws'));
   sender = createSender(socket);
-  socket.addEventListener('open', () => setConnected(true));
+  socket.addEventListener('open', () => {
+    setConnected(true);
+    // What was typed just before the socket dropped may not have reached the Mac: start the field over.
+    resetTyping();
+  });
   socket.addEventListener('message', (e) => {
     let message;
     try { message = JSON.parse(e.data); } catch { return; }
@@ -94,7 +98,11 @@ function connect() {
 }
 connect();
 
+/** Whether the socket is open, so commands reach the Mac. */
+let connected = false;
+
 function setConnected(on) {
+  connected = on;
   conn.classList.toggle('on', on);
   for (const layer of dotLayers) layer.render(); // the dots dim while the Host is away
   renderGestures(); // and so do the Gestures
@@ -176,7 +184,12 @@ function renderCode() {
 
 document.getElementById('unpair').addEventListener('click', async () => {
   if (!confirm('Unpair this Remote? To use it again, you’ll need a new code from the Mac.')) return;
-  await fetch('/unpair', { method: 'POST' }).catch(() => {});
+  // Only say it's unpaired once the Mac has agreed; 403 means the Mac already doesn't know this Remote.
+  const response = await fetch('/unpair', { method: 'POST' }).catch(() => null);
+  if (!response || !(response.ok || response.status === 403)) {
+    alert('Couldn’t unpair: the Mac didn’t answer. This Remote is still paired.');
+    return;
+  }
   sheet.close();
   showPairing();
 });
@@ -661,6 +674,12 @@ field.addEventListener('beforeinput', (e) => {
 field.addEventListener('input', (e) => {
   // In case iOS didn't let the edit be cancelled: put the field back, send nothing.
   if (fromManyFingers(e)) {
+    syncField();
+    return;
+  }
+  // With the Host away the commands would be dropped, and the field would no longer match the Mac's
+  // text: put it back, so a later correction doesn't erase the wrong characters.
+  if (!connected) {
     syncField();
     return;
   }
