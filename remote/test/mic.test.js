@@ -144,8 +144,21 @@ test('it reports each ring once, then times it again', () => {
 });
 
 test('notches: a free one first, deeper on the same tone, the oldest when full', () => {
-  assert.deepEqual(placeNotch([null, null], 1000), { index: 0, gain: -15 });
-  assert.deepEqual(placeNotch([1000, null], 1020), { index: 0, gain: -30 });
-  assert.deepEqual(placeNotch([1000, null], 1500), { index: 1, gain: -15 });
-  assert.deepEqual(placeNotch([1000, 1500], 2500), { index: 0, gain: -15 });
+  assert.deepEqual(placeNotch([null, null], 1000), { index: 0, gain: -15, oldest: 0 });
+  assert.deepEqual(placeNotch([1000, null], 1020), { index: 0, gain: -30, oldest: 0 });
+  assert.deepEqual(placeNotch([1000, null], 1500), { index: 1, gain: -15, oldest: 0 });
+  assert.deepEqual(placeNotch([1000, 1500], 2500), { index: 0, gain: -15, oldest: 1 });
+});
+
+test('once every notch is taken, new tones replace the oldest in turn, not always the first', () => {
+  const notches = [null, null, null, null];
+  let oldest = 0;
+  const placed = [500, 1000, 2000, 3000, 4000, 5000, 6000].map((f) => {
+    const { index, oldest: next } = placeNotch(notches, f, oldest);
+    notches[index] = f;
+    oldest = next;
+    return index;
+  });
+  assert.deepEqual(placed, [0, 1, 2, 3, 0, 1, 2]);
+  assert.deepEqual(notches, [4000, 5000, 6000, 3000]);
 });

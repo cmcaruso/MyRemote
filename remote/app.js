@@ -677,6 +677,15 @@ field.addEventListener('input', (e) => {
     syncField();
     return;
   }
+  // Mid-composition (Japanese or Chinese input) the text isn't settled, and putting the field back would
+  // break it: it's typed once the composition ends.
+  if (e.isComposing) return;
+  typeField();
+});
+field.addEventListener('compositionend', typeField);
+
+/** Types what changed in the field on the Mac, then puts the field back as the keyboard model has it. */
+function typeField() {
   // With the Host away the commands would be dropped, and the field would no longer match the Mac's
   // text: put it back, so a later correction doesn't erase the wrong characters.
   if (!connected) {
@@ -686,7 +695,7 @@ field.addEventListener('input', (e) => {
   dispatch(keyboard.input(field.value));
   syncField();
   renderKeys();
-});
+}
 
 // While the iOS keyboard is up, fit the console into what's left of the screen above it.
 function fitViewport() {
@@ -1038,12 +1047,15 @@ micButton.addEventListener('click', () => {
 });
 
 async function captureMic(m) {
+  // iOS can end the track and move the input at once, starting two captures: only the newest goes on.
+  const capture = (m.capture = (m.capture ?? 0) + 1);
+  const current = () => mic === m && m.capture === capture;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       // No auto-gain: in the pauses it turns up the room, and through a room's speakers, the Phone Mic itself.
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
     });
-    if (mic !== m) {
+    if (!current()) {
       for (const track of stream.getTracks()) track.stop();
       return;
     }
@@ -1052,7 +1064,7 @@ async function captureMic(m) {
     m.inputs = await audioInputs();
     renderFlip();
     await m.module;
-    if (mic !== m) return;
+    if (!current()) return; // a newer capture took over, and stopped this stream
     const { context } = m;
     const encoder = createMicEncoder({ inRate: context.sampleRate });
     const gate = createGate({ rate: context.sampleRate });
@@ -1062,12 +1074,14 @@ async function captureMic(m) {
     silent.gain.value = 0;
     m.source = context.createMediaStreamSource(stream);
     // The echo guard's filters: a low cut, then notches the howl detector tunes, flat until it does.
-    const lowCut = new BiquadFilterNode(context, { type: 'highpass', frequency: 100 });
+    // With the guard off the low cut is an allpass, which leaves every level as it is.
+    m.lowCut = new BiquadFilterNode(context, { type: guard === 'on' ? 'highpass' : 'allpass', frequency: 100 });
     m.notches = Array.from({ length: 4 }, () => ({
       frequency: null,
       filter: new BiquadFilterNode(context, { type: 'peaking', Q: 30, gain: 0 }),
     }));
-    let chain = m.source.connect(lowCut);
+    m.oldestNotch = 0;
+    let chain = m.source.connect(m.lowCut);
     for (const notch of m.notches) chain = chain.connect(notch.filter);
     chain.connect(tap).connect(silent).connect(context.destination);
     const analyser = new AnalyserNode(context, { fftSize: 2048, smoothingTimeConstant: 0 });
@@ -1083,7 +1097,7 @@ async function captureMic(m) {
     stream.getAudioTracks()[0]?.addEventListener('ended', () => { if (mic === m) recaptureMic(m); });
     if (!m.socket) openMicSocket(m, encoder.rate);
   } catch (e) {
-    if (mic !== m) return;
+    if (!current()) return;
     stopMic();
     if (e?.name === 'NotAllowedError') {
       micState = 'denied';
@@ -1102,7 +1116,8 @@ function listenForHowl(m, analyser) {
     analyser.getFloatFrequencyData(spectrum);
     const frequency = detect.update(spectrum, m.context.currentTime);
     if (frequency === null) return;
-    const { index, gain } = placeNotch(m.notches.map((n) => n.frequency), frequency);
+    const { index, gain, oldest } = placeNotch(m.notches.map((n) => n.frequency), frequency, m.oldestNotch);
+    m.oldestNotch = oldest;
     const notch = m.notches[index];
     notch.frequency = frequency;
     notch.filter.frequency.value = frequency;
@@ -1118,11 +1133,14 @@ let guard = (() => { try { return localStorage.getItem('micGuard') === 'off' ? '
 function setGuard(value) {
   guard = value;
   try { localStorage.setItem('micGuard', value); } catch {}
-  // Off leaves the sound alone, so the notches go flat too; they're found again when it's back on.
+  // Off leaves the sound alone, so the low cut lets everything through and the notches go flat; they're
+  // found again when it's back on.
+  if (mic?.lowCut) mic.lowCut.type = value === 'on' ? 'highpass' : 'allpass';
   for (const notch of mic?.notches ?? []) {
     notch.frequency = null;
     notch.filter.gain.value = 0;
   }
+  if (mic) mic.oldestNotch = 0;
 }
 
 /** Gets the microphone again after iOS took it away, keeping the socket and the AudioContext. */

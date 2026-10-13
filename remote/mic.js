@@ -160,11 +160,14 @@ export function createHowlDetector({ rate, bins }, p = HOWL) {
 
 /**
  * Where a new notch goes among `notches` (their frequencies, null when free): deeper on one already
- * within 3% of `frequency`, else the first free one, else the oldest. Returns its index and depth in dB.
+ * within 3% of `frequency`, else the first free one, else the oldest, at index `oldest`. Free slots
+ * fill from the first, so the oldest goes round from 0. Returns its index, its depth in dB, and which
+ * notch is the oldest afterwards.
  */
-export function placeNotch(notches, frequency, deepest = -30, depth = -15) {
+export function placeNotch(notches, frequency, oldest = 0, deepest = -30, depth = -15) {
   const near = notches.findIndex((f) => f !== null && Math.abs(f - frequency) / frequency < 0.03);
-  if (near >= 0) return { index: near, gain: deepest };
+  if (near >= 0) return { index: near, gain: deepest, oldest };
   const free = notches.indexOf(null);
-  return { index: free >= 0 ? free : 0, gain: depth };
+  if (free >= 0) return { index: free, gain: depth, oldest };
+  return { index: oldest, gain: depth, oldest: (oldest + 1) % notches.length };
 }
