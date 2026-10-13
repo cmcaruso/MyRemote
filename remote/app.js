@@ -513,7 +513,7 @@ function listen(el, recognizer, onCommands = () => {}, dots = null) {
   el.addEventListener('touchstart', handle('start'), { passive: false });
   el.addEventListener('touchmove', handle('move'), { passive: false });
   el.addEventListener('touchend', handle('end'), { passive: false });
-  el.addEventListener('touchcancel', handle('end'), { passive: false });
+  el.addEventListener('touchcancel', handle('cancel'), { passive: false });
 }
 
 listen(pad, () => trackpad, (commands) => {
