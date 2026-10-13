@@ -95,6 +95,18 @@ public struct Scroller: Sendable {
         return [ScrollEvent(dx: 0, dy: 0, momentum: .end)]
     }
 
+    /// The Remote went away: end the fingers' scroll if one is open, and any coast, so the next scroll
+    /// begins afresh rather than carrying on this one.
+    public mutating func cancel() -> [ScrollEvent] {
+        var events: [ScrollEvent] = []
+        if scrolling { events.append(ScrollEvent(dx: 0, dy: 0, phase: .ended)) }
+        if scrolling || coast != nil { events.append(ScrollEvent(dx: 0, dy: 0, momentum: .end)) }
+        scrolling = false
+        coast = nil
+        remainder = (0, 0)
+        return events
+    }
+
     /// Whether velocity `vx`, `vy` still moves at least `stopBelow` px in a frame.
     private static func moves(_ vx: Double, _ vy: Double) -> Bool {
         (vx * vx + vy * vy).squareRoot() * frameMs >= stopBelow

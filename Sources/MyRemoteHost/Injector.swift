@@ -76,10 +76,12 @@ final class Injector {
         }
     }
 
-    /// A Remote went away: never leave the button stuck down or the page coasting.
+    /// A Remote went away: never leave the button stuck down, a scroll open or the page coasting.
     func remoteLeft() {
         release()
-        stopMomentum()
+        momentum?.cancel()
+        momentum = nil
+        scroller.cancel().forEach(post)
         gestures.cancel().forEach(post)
         switcher.releaseNow().forEach(post)
     }
