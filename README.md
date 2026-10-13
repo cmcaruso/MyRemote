@@ -2,7 +2,7 @@
 
 Control your Mac from your iPhone over [Tailscale](https://tailscale.com). A menubar app on the Mac (the **Host**) serves a web app (the **Remote**) that you add to the iPhone's Home Screen. The Remote has four Modes: Trackpad, Keyboard, Media and Presentation.
 
-Status: v1.2. All four Modes work, the trackpad does the Mac trackpad's Gestures, a Setup guide walks a new Mac through Tailscale and pairing, and a Remote has to be paired before it can control the Mac. Download it from [Releases](https://github.com/cmcaruso/MyRemote/releases/latest), or build it from source. One install serves one user and one Mac.
+Status: v1.3. All four Modes work, the trackpad does the Mac trackpad's Gestures, a Setup guide walks a new Mac through Tailscale and pairing, and a Remote has to be paired before it can control the Mac. Download it from [Releases](https://github.com/cmcaruso/MyRemote/releases/latest), and it keeps itself up to date, or build it from source. One install serves one user and one Mac.
 
 ## Requirements
 
@@ -39,7 +39,9 @@ Download it, or build it from source.
 3. In **System Settings → Privacy & Security**, scroll down to "MyRemote was blocked", click **Open Anyway** and confirm. macOS remembers this, so you only do it once per version.
 4. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted".
 
-When you update to a new version, macOS asks for Accessibility again: the switch may still look on, so remove MyRemote from the list with **−** and turn on the new one when macOS asks.
+From 1.3.0 on, MyRemote updates itself: it checks GitHub once a day, and when there's a new version it shows what's new and asks before installing it and relaunching. **Check for Updates…** in the menu checks right away. The Accessibility grant carries over to the new version. The check is one HTTPS request to GitHub for the latest Release's `appcast.xml`, so GitHub sees your IP address and MyRemote's version, and nothing else is sent. MyRemote installs only an update signed with the key the app was built with.
+
+Versions before 1.3.0 can't update themselves, so install 1.3.0 by hand, as above. macOS then asks for Accessibility again: the switch may still look on, so remove MyRemote from the list with **−** and turn on the new one when macOS asks.
 
 Each release's DMG is built from the commit tagged with its version (`v1.2.0` and so on), and the release page links that tag's source.
 
@@ -51,7 +53,7 @@ cd MyRemote
 scripts/bundle.sh --run
 ```
 
-This builds `build/MyRemote.app` and opens it. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted". You can move the app to `/Applications` if you like.
+This builds `build/MyRemote.app` and opens it. A build from source doesn't update itself: pull and build again. A hand icon appears in the menu bar. macOS asks to allow MyRemote under **System Settings → Privacy & Security → Accessibility**. Turn it on, and the menu changes to "Accessibility: granted". You can move the app to `/Applications` if you like.
 
 The app is signed ad hoc, so macOS asks for Accessibility again after every rebuild. `--run` quits System Settings and clears the old entry first. If the switch is on but the pointer doesn't move, remove MyRemote from the list with **−** and add `build/MyRemote.app` again with **+**. If you rebuild often, sign with a code-signing identity of your own. A self-signed one is enough: in Keychain Access, choose Keychain Access → Certificate Assistant → **Create a Certificate…**, give it a name, set Certificate Type to **Code Signing**, and create it. Then copy `scripts/signing.local.example` to `scripts/signing.local` (it's git-ignored) and set `MYREMOTE_SIGN_IDENTITY`. The grant then survives rebuilds.
 
@@ -65,6 +67,7 @@ The menu shows:
 - **Pair a Remote…**, and the **Paired Remotes** you can revoke (see below);
 - the Accessibility grant, with a button to its settings if it's missing;
 - **Launch at Login**. The login item remembers where the app is. It stays on when `bundle.sh` rebuilds the app in place, but if you move the app, turn it off first and on again from the new place. macOS may ask you to approve it in System Settings → General → Login Items.
+- **Check for Updates…**, in the downloaded app (see [Download](#download)).
 
 ### 3. Add the Remote to the iPhone
 
@@ -170,7 +173,12 @@ The layout:
 - `remote/`: the Remote, plain ES modules with no build step. The Host serves them as they are.
 - `scripts/bundle.sh`: builds the `.app` and signs it (ad hoc unless you set an identity).
 - `scripts/icons.swift`: draws the app icon and the Remote's Home Screen icons. Run it with `swift scripts/icons.swift` after changing them.
-- `scripts/dmg.sh`: builds a universal (Apple Silicon and Intel) app into `build/dmg/` and packs it into `build/MyRemote-<version>.dmg` for a release.
+- `scripts/dmg.sh`: builds a universal (Apple Silicon and Intel) app into `build/dmg/`, with updates on, and packs it into `build/MyRemote-<version>.dmg` for a release, along with `build/appcast.xml`, the feed the installed apps check.
+
+To release a version: raise `CFBundleShortVersionString` and `CFBundleVersion` in `scripts/Info.plist` (updates compare `CFBundleVersion`), commit, tag `v<version>` and push the tag, then run `scripts/dmg.sh` (`MYREMOTE_NOTES=notes.md scripts/dmg.sh` shows those notes in the update window). Attach both the DMG and `appcast.xml` to the tag's Release. The apps read the feed from the latest Release, so publishing the Release is what ships the update. Two things on the releasing Mac sign it, and they must stay the same from one version to the next, so back them up:
+
+- the code-signing identity in `scripts/signing.local`. `dmg.sh` won't build a release signed ad hoc, since each update would lose the Accessibility grant. A new identity costs every user one more Accessibility grant;
+- the EdDSA key Sparkle signs updates with, in the login keychain (made once with Sparkle's `generate_keys`, in `.build/artifacts/sparkle/Sparkle/bin`; back it up with `generate_keys -x <file>`). Its public half is `scripts/sparkle-public-key`. Without the private key, installed apps can't be updated.
 
 `CONTEXT.md` defines the project's vocabulary (Host, Remote, Setup, Mode, Gesture, Mac trackpad settings, Pairing, Laser, Phone Mic).
 
@@ -178,6 +186,6 @@ The layout:
 
 MyRemote is free software under the [GNU General Public License v3.0](LICENSE).
 
-The Remote's icons and the app icon come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The Host is built on [Hummingbird](https://github.com/hummingbird-project/hummingbird), [SwiftNIO](https://github.com/apple/swift-nio) and other Swift packages under the Apache License 2.0; the app carries each one's licence and NOTICE in `MyRemote.app/Contents/Resources/Licenses`. The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
+The Remote's icons and the app icon come from [Lucide](https://lucide.dev) (ISC licence; portions from Feather, MIT). The Host is built on [Hummingbird](https://github.com/hummingbird-project/hummingbird), [SwiftNIO](https://github.com/apple/swift-nio) and other Swift packages under the Apache License 2.0, and updates itself with [Sparkle](https://sparkle-project.org) (MIT); the app carries each one's licence and NOTICE in `MyRemote.app/Contents/Resources/Licenses`. The way the Host posts trackpad gesture events was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for their licences.
 
 MyRemote is an independent project, not affiliated with or endorsed by Apple or Tailscale. Mac, macOS, iPhone, iOS, Safari and the other Apple product names are trademarks of Apple Inc., and Tailscale is a trademark of Tailscale Inc.; they're used here only to say what MyRemote works with.
