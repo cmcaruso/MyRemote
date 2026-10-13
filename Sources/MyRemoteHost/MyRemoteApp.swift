@@ -67,7 +67,11 @@ struct HostMenu: View {
         }
         pairedRemotes
         if let error = host.pairings.saveError {
-            Text("Can't save paired Remotes: \(error)")
+            if host.pairings.unsavedRevocation {
+                Text("Revocation not saved: \(error). It holds until MyRemote quits, and saving is tried again on every change.")
+            } else {
+                Text("Can't save paired Remotes: \(error)")
+            }
         }
         Divider()
         phoneMic

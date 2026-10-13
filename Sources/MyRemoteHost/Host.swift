@@ -62,8 +62,8 @@ final class Host {
         if !accessibilityGranted {
             // On first launch Setup asks for it in its turn, rather than macOS's prompt covering Setup.
             if !opensSetupAtLaunch { _ = CGRequestPostEventAccess() }
-            watchAccessibility()
         }
+        watchAccessibility()
 
         // Keep every Remote's volume slider in step with the Mac.
         volume.onChange = { [weak self] in self?.pushVolume() }
@@ -226,11 +226,12 @@ final class Host {
         AXIsProcessTrusted() || CGPreflightPostEventAccess()
     }
 
-    /// Accessibility is granted in System Settings while the Host runs; notice it without a restart.
+    /// Accessibility is granted, or taken away, in System Settings while the Host runs; notice it without a
+    /// restart. Quickly while it's missing, now and then once it's there.
     private func watchAccessibility() {
         Task {
-            while !accessibilityGranted {
-                try? await Task.sleep(for: .seconds(2))
+            while true {
+                try? await Task.sleep(for: .seconds(accessibilityGranted ? 10 : 2))
                 accessibilityGranted = Self.canPostEvents()
             }
         }
