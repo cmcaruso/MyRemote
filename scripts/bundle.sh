@@ -40,6 +40,8 @@ cp "$BIN" "$APP/Contents/MacOS/MyRemote"
 rsync -a --exclude test remote/ "$APP/Contents/Resources/remote/"
 sed "s/__BUNDLE_ID__/$BUNDLE_ID/" scripts/Info.plist > "$APP/Contents/Info.plist"
 cp LICENSE THIRD_PARTY_NOTICES.md scripts/AppIcon.icns "$APP/Contents/Resources/"
+# The Swift packages' own licences and NOTICE files, which their Apache License asks every copy to carry.
+scripts/licenses.sh "$APP/Contents/Resources/Licenses"
 
 codesign --force --sign "$IDENTITY" "$APP"
 if [ "$IDENTITY" = "-" ]; then

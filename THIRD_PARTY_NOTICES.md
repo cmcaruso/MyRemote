@@ -50,10 +50,31 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## Swift packages
+
+The Host is built with these Swift packages, all under the Apache License 2.0 (some with the Swift
+runtime library exception), each copyright its own authors:
+
+Hummingbird and HummingbirdWebSocket (the Hummingbird Project), SwiftNIO, SwiftNIO Extras, SwiftNIO
+HTTP/2, SwiftNIO SSL, SwiftNIO Transport Services, Swift HTTP Types, Swift HTTP Structured Headers,
+Swift Async Algorithms, Swift Algorithms, Swift Atomics, Swift Collections, Swift Numerics, Swift
+System, Swift Crypto, Swift ASN.1, Swift Certificates, Swift Log, Swift Metrics, Swift Distributed
+Tracing, Swift Service Context, Swift Service Lifecycle, Swift Configuration and AsyncHTTPClient (Apple
+Inc. and the SwiftNIO and Swift Server projects), CompressNIO (Adam Fowler) and swift-websocket (the
+Hummingbird Project). SwiftNIO includes llhttp (MIT) and a SHA-1 implementation from FreeBSD (BSD), as
+its NOTICE says.
+
+`Package.resolved` pins the exact versions. `scripts/licenses.sh` copies every package's own LICENSE
+and NOTICE files into the app, at `MyRemote.app/Contents/Resources/Licenses`, with a list of the
+packages, their versions and where their source is. The Apache License 2.0 is at
+<https://www.apache.org/licenses/LICENSE-2.0> and in each package's folder there.
+
 ## Mac Mouse Fix
 
-How the Host posts trackpad gesture events (the private `CGEvent` types and numbered fields for zoom,
-rotate, smart zoom, page swipes, gesture scrolls and dock swipes, and values such as the exit speed and
-the gesture-scroll scale) was learned from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix)
-by Noah Nuebling, which is under the MMF License. MyRemote doesn't include Mac Mouse Fix's code: the Host
-posts these events with its own Swift code (`Sources/MyRemoteHost/Injector.swift`, `Sources/HostCore`).
+macOS has no public API for posting trackpad gestures. The facts the Host needs about them were learned
+from [Mac Mouse Fix](https://github.com/noah-nuebling/mac-mouse-fix) by Noah Nuebling, which is under
+the MMF License: which private `CGEvent` types and numbered fields carry zoom, rotate, smart zoom, page
+swipes, gesture scrolls and dock swipes, the values those fields take, the 1.67 scale for gesture
+scrolls, and that a dock swipe's end carries an exit speed. These are facts about how macOS reads its
+own events, not Mac Mouse Fix's code. MyRemote posts the events with its own Swift code
+(`Sources/MyRemoteHost/Injector.swift`, `Sources/HostCore`) and doesn't include Mac Mouse Fix's code.
