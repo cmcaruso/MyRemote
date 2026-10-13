@@ -60,15 +60,24 @@ public enum GestureAction: String, Sendable {
 }
 
 extension Command {
-    /// Decodes one frame. Returns nil for anything malformed or unknown, so a bad frame is skipped, never fatal.
+    /// The most a delta may be, in px (pointer, scroll, Laser): far beyond any burst the Remote merges
+    /// under backpressure, and well inside the integer types events carry.
+    public static let maxDelta = 10_000.0
+    /// The most a scroll-end velocity may be, in px/ms.
+    public static let maxVelocity = 50.0
+    /// The most Backspaces one typing frame may press, so a frame can't keep the Host busy for long.
+    public static let maxBackspaces = 4_096
+
+    /// Decodes one frame. Returns nil for anything malformed or unknown, so a bad frame is skipped, never
+    /// fatal. Numbers must be finite; deltas are clamped to sane sizes and click and Backspace counts limited.
     public init?(decoding text: String) {
         guard let frame = try? JSONDecoder().decode(Frame.self, from: Data(text.utf8)) else { return nil }
         switch frame.t {
         case "m":
-            guard let dx = frame.dx, let dy = frame.dy else { return nil }
+            guard let (dx, dy) = frame.delta else { return nil }
             self = .move(dx: dx, dy: dy)
         case "c":
-            guard let b = frame.b, let n = frame.n, n >= 1 else { return nil }
+            guard let b = frame.b, let n = frame.n, (1...3).contains(n) else { return nil }
             switch b {
             case 0: self = .click(.left, count: n)
             case 1: self = .click(.right, count: n)
@@ -79,21 +88,21 @@ extension Command {
         case "u":
             self = .buttonUp
         case "s":
-            guard let dx = frame.dx, let dy = frame.dy else { return nil }
+            guard let (dx, dy) = frame.delta else { return nil }
             self = .scroll(dx: dx, dy: dy)
         case "se":
-            guard let vx = frame.vx, let vy = frame.vy else { return nil }
-            self = .scrollEnd(vx: vx, vy: vy)
+            guard let vx = frame.vx, let vy = frame.vy, vx.isFinite, vy.isFinite else { return nil }
+            self = .scrollEnd(vx: vx.clamped(Self.maxVelocity), vy: vy.clamped(Self.maxVelocity))
         case "x":
             self = .touchDown
         case "k":
             guard let k = frame.k, let key = MediaKey(rawValue: k) else { return nil }
             self = .mediaKey(key)
         case "v":
-            guard let v = frame.v else { return nil }
+            guard let v = frame.v, v.isFinite else { return nil }
             self = .setVolume(min(max(v, 0), 1))
         case "tx":
-            guard let bs = frame.bs, bs >= 0, let s = frame.s else { return nil }
+            guard let bs = frame.bs, (0...Self.maxBackspaces).contains(bs), let s = frame.s else { return nil }
             self = .type(backspaces: bs, text: s)
         case "kp":
             guard let flags = KeyFlags(wire: frame.m ?? []) else { return nil }
@@ -112,13 +121,14 @@ extension Command {
         case "ls":
             self = .laserStart
         case "l":
-            guard let dx = frame.dx, let dy = frame.dy else { return nil }
+            guard let (dx, dy) = frame.delta else { return nil }
             self = .laserMove(dx: dx, dy: dy)
         case "le":
             self = .laserEnd
         case "g":
-            guard let g = frame.g, let gesture = Gesture(rawValue: g), let d = frame.d else { return nil }
-            self = .gesture(gesture, delta: d)
+            guard let g = frame.g, let gesture = Gesture(rawValue: g), let d = frame.d, d.isFinite else { return nil }
+            // A frame's worth of rotation is a few degrees; of the other Gestures, a fraction of 1.
+            self = .gesture(gesture, delta: d.clamped(gesture == .rotate ? 180 : 10))
         case "ge":
             guard let g = frame.g, let gesture = Gesture(rawValue: g), let ok = frame.ok else { return nil }
             self = .gestureEnd(gesture, completes: ok)
@@ -149,4 +159,17 @@ private struct Frame: Decodable {
     var d: Double?
     var ok: Bool?
     var a: String?
+
+    /// `dx`, `dy` when both are there and finite, clamped to `Command.maxDelta`.
+    var delta: (Double, Double)? {
+        guard let dx, let dy, dx.isFinite, dy.isFinite else { return nil }
+        return (dx.clamped(Command.maxDelta), dy.clamped(Command.maxDelta))
+    }
+}
+
+private extension Double {
+    /// Clamped to -`limit`…`limit`.
+    func clamped(_ limit: Double) -> Double {
+        Swift.min(Swift.max(self, -limit), limit)
+    }
 }
